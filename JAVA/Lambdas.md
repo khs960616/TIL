@@ -4,7 +4,7 @@ Java Lambda
 
 자바에서 람다식은 일급 객체이다. (lambda expression은 함수의 매개변수로 전달될 수 있으며, 메서드의 결과로 반환될 수도 있다.
 
-람다식을 통해 메서드를 마치 변수처럼 다루는 것이 가능해진다. 
+람다식을 통해 메서드를 마치 변수처럼 다루는 것이 가능해진다.
 
 ```
 Lambdas give us the ability to encapsulate a single unit of code block and pass on to another code.
@@ -44,7 +44,13 @@ For multiple statements in function body should be enclosed with in courly brace
 If lambda body exnclosed inside courly braces then return keyward is required in case your behavior returns value.
 ~~~
 
+람다식은 오직 함수형 인터페이스로 형변환이 가능하다. (Object로 형변환을 해야한다면 우선 함수형 인터페이스로 형변환이 먼저 된 상태여야 한다.)
 
+함수형 인터페이스로 람다식을 참조할 수 있는 것일 뿐, 람다식의 타입이 함수형 인터페이스의 타입과 정확히 일치하는 것은 아니다.
+
+람다식은 **"익명 객체 (익명 클래스의 인스턴스)"** 이고, 자바에서 익명 객체는 타입이 없다. (정확히는 타입은 존재하나, 컴파일러가 임의로 이름을 정하기 때문에 알 수 없다.) 
+
+람다식에서 외부에 선언된 변수에 접근 하는 규칙은 익명 클래스의 경우와 같다. (기본적으로 람다식 내에서 지역변수를 참조하는 경우, 해당 지역변수가 final이 아니더라도, 상수로 간주된다.) 
 
 ### REF
 
