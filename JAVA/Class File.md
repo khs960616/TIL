@@ -50,6 +50,7 @@ jvm의 명령어는 런타임에 클래스, 인터페이스 등의 layout에 의
 
 tag : constant_pool에 존재하는 데이터가 어떠한 유형인지 나타내는 필드이다. tag 뒤에는 2바이트 이상의 바이트로 해당 상수에 대한 구체적인 정보를 나타내며, 태그값에 따라 뒤에 오는 포맷이 달라지게 된다. 
 
+
 |Constant Type|Value|
 |---|---|
 |CONSTANT_Class|7|
@@ -73,6 +74,77 @@ CONSTANT_Class_info {
     u2 name_index;
 }
 ```
+클래스 또는 인터페이스의 정보를 나타내는 데 쓰인다. (tag는 CONSTANT_Class인 7값을 가진다)
+
+name_index는 constant_pool 테이블에 존재하는 엔트리의 인덱스를 가진다. 
+
+또한 해당 인덱스는 클래스 또는 인터페이스의 이름을 나타내는 CONSTANT_Utf8_info 타입의 엔트리여야 한다.
+
+
+```
+CONSTANT_Utf8_info {
+    u1 tag;
+    u2 length;
+    u1 bytes[length];
+}
+```
+
+상수의 String value를 나타내는데 쓰인다. (tag값은 표에 명시된 것처럼 1을 가진다)
+
+length : bytes array의 길이를 나타낸다. (이 때, 해당 length는 string의 길이를 나타내는 것이 아니다.)
+
+bytes[] : 나타내는 string의 바이트를 포함한다. (각 바이트는 0, 0xf0 ~ 0xff의 값을 가질 수 없다는 제약조건이 있다고 함) 
+
+문자열은 utf-8형태로 인코딩되며, 각 문자열은 non-null 아스키코드을 포함하지 않는다.
+
+```
+CONSTANT_NameAndType_info {
+    u1 tag;
+    u2 name_index;
+    u2 descriptor_index;
+}
+```
+클래스의 field 또는 method를 나타내는데 쓰이며 어떤 클래스 (또는 인터페이스)를 나타내는지에 대한 정보를 가지고 있지는 않다. 
+
+name_index : 상수풀의 엔트리에서 참조하고 있는 index를 나타낸다. 해당 index는 반드시 CONSTANT_Utf8_info 타입의 엔트리여야 한다. 해당 엔트리는 필드 또는 메서드명을 나타낸다. 
+
+name_and_type_index: 상수풀의 엔트리에서 참조하고 있는 index를 나타낸다. 해당 index는 반드시 CONSTANT_Utf8_info 타입의 엔트리여야 한다. 
+
+필드 또는 엔트리에 대한 Descriptors를 나타낸다. 
+
+```
+CONSTANT_Fieldref_info {
+    u1 tag;
+    u2 class_index;
+    u2 name_and_type_index;
+}
+
+CONSTANT_Methodref_info {
+    u1 tag;
+    u2 class_index;
+    u2 name_and_type_index;
+}
+
+CONSTANT_InterfaceMethodref_info {
+    u1 tag;
+    u2 class_index;
+    u2 name_and_type_index;
+}
+```
+
+class_index : 상수풀의 엔트리에서 참조하고 있는 index를 나타낸다. 해당 index는 반드시 CONSTANT_Class_info 타입의 엔트리여야 한다. 
+
+- CONSTANT_Fieldref_info : 클래스 타입 또는 인터페이스 타입 두 가지 모두 가능하다.
+- CONSTANT_Methodref_info : 반드시 클래스 타입에 대한 참조여야한다.
+- CONSTANT_InterfaceMethodref_info: 반드시 인터페이스 타입에 대한 참조여야한다. 
+
+
+name_and_type_index : 상수풀의 엔트리에서 참조하고 있는 index를 나타낸다. 해당 index는 반드시 CONSTANT_NameAndType_info 타입이여야한다.
+
+해당 엔트리가 가르키는 index는 필드 또는 메서드에 이름과 descriptor에 대한 정보를 가지고 있다. 
+
+
+---
 
 ```
 field_info {
