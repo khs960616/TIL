@@ -112,6 +112,34 @@ name_and_type_index: 상수풀의 엔트리에서 참조하고 있는 index를 �
 
 필드 또는 엔트리에 대한 Descriptors를 나타낸다. 
 
+---
+```
+CONSTANT_MethodHandle_info {
+    u1 tag;
+    u1 reference_kind;
+    u2 reference_index;
+}
+```
+
+
+```
+CONSTANT_MethodType_info {
+    u1 tag;
+    u2 descriptor_index;
+}
+
+```
+
+```
+CONSTANT_InvokeDynamic_info {
+    u1 tag;
+    u2 bootstrap_method_attr_index;
+    u2 name_and_type_index;
+}
+```
+
+
+---
 ```
 CONSTANT_Fieldref_info {
     u1 tag;
@@ -143,8 +171,9 @@ name_and_type_index : 상수풀의 엔트리에서 참조하고 있는 index를 
 
 해당 엔트리가 가르키는 index는 필드 또는 메서드에 이름과 descriptor에 대한 정보를 가지고 있다. 
 
-
 ---
+
+
 
 ```
 field_info {
@@ -187,3 +216,63 @@ little-Endian : 상위 바이트를 메모리의 상위 번지 수에 저장한�
 
 
 리틀 엔디안 방식에는  100번지 : 78,   101번지 56,   102번지 34,   103번지 12의 형태로 데이터를 저장하게 된다. 
+
+---
+### 자바 Field Descriptors 
+
+해당 필드가 어떤 타입인지를 나타내는 string 
+
+```
+FieldDescriptor:
+    FieldType
+
+FieldType:
+    BaseType
+    ObjectType
+    ArrayType
+
+BaseType:
+    B                   (바이트)
+    C                   (캐릭터)
+    D                   (double)
+    F                   (float)
+    I                   (int)       
+    J                   (long)
+    S                   (short)
+    Z                   (boolean)
+
+ObjectType:
+    L ClassName ;
+
+ArrayType:
+    [ ComponentType
+
+ComponentType:
+    FieldType
+```
+
+ex) 
+int [][] 타입의 변수인 경우 FieldDescriptor는 [[I의 형태의 스트링으로 표현 
+Test라는 클래스 타입을 가진 필드인 경우 L TEST; 형태로 디스크립터가 표현된다.
+
+---
+### 자바 메서드 descriptor 
+
+```
+MethodDescriptor:
+    ( ParameterDescriptor* ) ReturnDescriptor
+```
+```
+ParameterDescriptor:
+    FieldType
+```
+```
+ReturnDescriptor:
+    FieldType
+    VoidDescriptor
+
+VoidDescriptor:
+    V
+```
+
+어떠한 parameter를 받는지, 반환 값은 무엇인지에 대해 나타내는 string
