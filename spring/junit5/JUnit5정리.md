@@ -11,3 +11,25 @@
     사용이 가능하다. 
   - https://docs.spring.io/spring-framework/docs/current/javadoc-api/org/springframework/test/annotation/DirtiesContext.MethodMode.html
   - https://docs.spring.io/spring-framework/docs/current/javadoc-api/org/springframework/test/annotation/DirtiesContext.ClassMode.html
+
+---
+### 테스트 인스턴스의 라이프 사이클
+
+
+---
+@BeforeAll :
+```
+Denotes that the annotated method should be executed before all @Test, @RepeatedTest, @ParameterizedTest, and @TestFactory methods in the current class; analogous to JUnit 4’s @BeforeClass. Such methods are inherited – unless they are hidden, overridden, or superseded, (i.e., replaced based on signature only, irrespective of Java’s visibility rules) – and must be static unless the "per-class" test instance lifecycle is used.
+```
+
+@AfterAll : 
+
+```
+Denotes that the annotated method should be executed after all @Test, @RepeatedTest, @ParameterizedTest, and @TestFactory methods in the current class; analogous to JUnit 4’s @AfterClass. Such methods are inherited – unless they are hidden, overridden, or superseded, (i.e., replaced based on signature only, irrespective of Java’s visibility rules) – and must be static unless the "per-class" test instance lifecycle is used.
+```
+
+현재 클래스에 모든 Test 메서드가 실행되기 전, 종료된 후 1번 실행될 메서드에 사용하는  어노테이션들이다. 
+
+@BeforeEach와 @AfterEach는 각 테스트 메소드의 실행 전후로 1번 실행되는 메서드이다. 
+
+---
