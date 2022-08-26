@@ -27,7 +27,15 @@ th:utext,   [(${attribute명})]
 
 ---
 #### Spring Expression Languag
+The Spring Expression Language (SpEL for short) is a powerful expression language that supports querying and manipulating an object graph at runtime.
 
+#{SpEL 표현식}의 형태로 사용하며 SpEL 표현식의 값을 evaluation 한다.
+
+${someobject.property} 특정 속성값에 대한 참조는 다음과 같이 표현한다. 
+
+사용 시 참고 사항 
+https://atoz-develop.tistory.com/entry/Spring-SpEL-Spring-Expression-Language
+https://docs.spring.io/spring-framework/docs/3.0.x/reference/expressions.html
 
 ---
 ### REF
