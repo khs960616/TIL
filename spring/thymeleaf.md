@@ -26,6 +26,27 @@ th:text=${attribute명}   // 해당 태그의 text를 변수의 value로 변경�
 th:utext,   [(${attribute명})]
 
 ---
+#### thymeleaf 기본 객체 
+
+스프링과 연동해서 사용시 다음의 몇가지 객체 접근 방식을 활용할 수 있다. 
+
+- ${#request}   // HttpServlertRequest
+- ${#response}  // HttpServlertResponse
+- ${#session}   // HTTPSession
+- ${$servletContext}
+- ${#locale}
+- ${param} // 쿼리 파라미터 접근 
+- ${#locale}
+
+${@beanName}으로 스프링 빈에 접근 또한 가능하다. 
+
+---
+#### thymeleaf 유틸리티 객체 
+https://www.thymeleaf.org/doc/tutorials/3.0/usingthymeleaf.html#expression-utility- objects
+
+https://www.thymeleaf.org/doc/tutorials/3.0/usingthymeleaf.html#appendix-b-expression- utility-objects
+
+---
 #### Spring Expression Languag
 The Spring Expression Language (SpEL for short) is a powerful expression language that supports querying and manipulating an object graph at runtime.
 
