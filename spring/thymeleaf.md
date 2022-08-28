@@ -101,6 +101,9 @@ th:if : expression의 값이 true가 아니라면 해당 태그는 렌더링 되
 
 th:swtich-case : th:switch로 지정해준 value와 일치하는 case만 렌더링한다.
 
+---
+### <th:block> </th:block>
+타입 리프에서 제공하는 태그이며 렌더링시 제거된다. 여러 html 태그에 걸쳐서 th:each를 적용해야 되는 경우 해당 block을 적용하면 쉽게 처리가 가능하다. 
 
 ---
 ### REF
