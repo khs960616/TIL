@@ -73,6 +73,34 @@ th:attrappend="추가할속성 = ' value'"    (html element에 특정 속성에 
 
 th:classappend="'추가할 클래스'" (html element에 특정 클래스 값을 추가한다. 이 경우 알아서 띄어쓰기를 해준다.)
 
+---
+### th:each
+th:each="각 element를 의미하는 변수명 각 element에 대한 반복 상태를 의미하는 변수명 :${반복의 대상이 되는 컬렉션}" 형태로 사용이 가능하다. 
+
+첫 번째 위치하는 변수명은 실제 컬렉션에 들어있는 element이며, 
+
+두 번째 위치하는 변수명은 (생략시 첫 번쨰 변수명 +stat으로 자동으로 생성) 반복 상태를 의미한다. 
+
+index, count, size, even, odd, first , lass, current 등 현재 객체가 컬렉션에서 어디에 위치하는지, 짝수번째 index인지 홀수번쨰 index인지,
+
+어떠한 객체인지 등의 정보를 추가로 알려준다.
+
+### th:if, th:unless, th:switcvh
+```
+th:if="${expression}"
+
+th:unless="${expression}"
+
+th:switch="${expression}"
+th:case = "value"
+th:case = "value"
+th:case = "value"
+```
+
+th:if : expression의 값이 true가 아니라면 해당 태그는 렌더링 되지 않는다. (unless는 false인 경우에만 렌더링함, if문의 반대) 
+
+th:swtich-case : th:switch로 지정해준 value와 일치하는 case만 렌더링한다.
+
 
 ---
 ### REF
