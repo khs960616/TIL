@@ -59,6 +59,14 @@ https://atoz-develop.tistory.com/entry/Spring-SpEL-Spring-Expression-Language
 https://docs.spring.io/spring-framework/docs/3.0.x/reference/expressions.html
 
 ---
+### Elvis 연산자 
+${expression} ?: "대체할 표현식"
+
+데이터가 null 인 경우 ?: 뒤에 오는 표현식으로 대체한다. 또한 
+
+?: _ 처럼 (_)를 사용하는 경우 no-operation을 의미하며 데이터가 null인 경우 thymeleaf 태그를 무효화한다. 
+
+---
 ### REF
 인프런 - 스프링 MVC 2편
 https://www.thymeleaf.org/
