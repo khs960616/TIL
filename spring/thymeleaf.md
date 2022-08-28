@@ -67,6 +67,14 @@ ${expression} ?: "대체할 표현식"
 ?: _ 처럼 (_)를 사용하는 경우 no-operation을 의미하며 데이터가 null인 경우 thymeleaf 태그를 무효화한다. 
 
 ---
+### attribute 추가
+
+th:attrappend="추가할속성 = ' value'"    (html element에 특정 속성에 값을 추가한다.)
+
+th:classappend="'추가할 클래스'" (html element에 특정 클래스 값을 추가한다. 이 경우 알아서 띄어쓰기를 해준다.)
+
+
+---
 ### REF
 인프런 - 스프링 MVC 2편
 https://www.thymeleaf.org/
