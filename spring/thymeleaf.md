@@ -106,6 +106,38 @@ th:swtich-case : th:switch로 지정해준 value와 일치하는 case만 렌더�
 타입 리프에서 제공하는 태그이며 렌더링시 제거된다. 여러 html 태그에 걸쳐서 th:each를 적용해야 되는 경우 해당 block을 적용하면 쉽게 처리가 가능하다. 
 
 ---
+### Fragment
+```html
+<htmlTag th:template = "fragment이름 (param1, param2....)">  
+...
+</htmlTag>
+```
+형태로 특정 html 태그를 fragment로 지정하고, 이름과 parameter를 부여하면 thymeleaf로 렌더링 되는 다른 html 파일에서 
+
+해당 fragment가 존재하는 html 파일 경로와, fragment의 이름을 통해 재활용할 수 있다. 
+
+th:insert="~{경로 :: fragment 이름}" 
+
+(사용된 태그의 하위로 element를 insert한다. 단 사용한 태그 하위의 기존에 자식 노드가 존재했다면, 해당 자식 노드들은 다 사라지는 것으로 보임)
+
+th:replace="~{경로 :: fragment 이름}" (사용된 태그를 fragment로 대체시킨다.)
+
+경로가 단순한 경우 "~{경로 :: fragment 이름}"없이 그냥 "/경로 :: fragment이름" 형태의 단순 표현식으로 경로와 Fragment 이름을 명시할 수 있음
+
+---
+### 템플릿 레이아웃 
+
+사용할 레이아웃을 fragment로 먼저 생성해놓는다. 이때 레이아웃마다 값을 변화시키거나 추가하고자하는 값이 있다면 parameter로 받아서 페이지별로 다르게 렌더링한다. 
+
+~{::htmlTag} 형태로 현재 페이지내의 dom element를 직접 넘길 수 있다. 만약 해당 html tag가 여러 개라면, 여러 개가 하나의 변수로 다 같이 넘어가게 된다.  
+
+fragment에 필요한 몇 가지 요소를 parameter로 넘겨서 페이지 마다 조금씩 다르게 사용하는 좀 더 확장된 개념이라고 강의에서는 설명한다 
+
+(근데 뭐 그냥 의미적으로 크게 나눠서 사용할 이유는 굳이 있나 싶음. 그냥 ~{::tag} 형태로 현재 html에 존재하는 태그를 넘길 수 있다는 것 정도로 알아 두면 될 듯 하다.)
+
+( th:replace로 실제 레이아웃으로 대체되는 부분 하위에 존재하는 태그만 넘어갈 줄 알았는데, 실제 레이아웃을 불러다 쓰는 html 파일에 있는 태그 다 넘기니 주의 할 것. 
+
+---
 ### REF
 인프런 - 스프링 MVC 2편
 https://www.thymeleaf.org/
