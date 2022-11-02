@@ -67,8 +67,50 @@ Serializable Schedule(직렬화 스케쥴) : 각 트랜잭션의 I/O action들�
 > 실행순서가 보장되지 않으므로 이를 보완하기 위한 여러 테크닉이 필요하다.
 ---
 ### 인터리브된 실행에 의해 발생될 수 있는 이상 현상
+![Over write](./images/read_uncommit.png)
 
+**Dirty Read** : 실제 데이터 베이스에서 Dirty Read는, 커밋되지 않은 트랜잭션에 의해 수정된 데이터를 읽어오는 것을 허용할 때 발생하는 문제이다.
 
+```
+1. 첫 번째 트랜잭션에서 데이터 A를 변경함
+2. 두 번째 트랜잭션에서는 (1)에서 수정된 데이터 A를 읽어 로직을 처리하여 다시 데이터 A를 저장하고 commit 한 경우
+3. 첫 번쨰 트랜잭션이 abort 되어 롤백됨
+```
+
+> 첫 번째 트랜잭션이 commit 되는 경우에는 두 번째 트랜잭션 또한, 정상적인 데이터를 읽은 것이므로 문제가 되지 않는다.
+> 그러나 첫 번째 트랜잭션이 Roll back되는 경우, 
+> 두 번째 트랜잭션은 실제로 존재하지않는(abort된) dirty data를 읽은 후 로직을 처리하는 것이므로 문제가 생길 수 있다. 
+
+테스트 참고용 링크 : https://codingsight.com/understanding-dirty-read-problem-sql-server/
+
+---
+![Over write](./images/unrepeatable.png)
+
+**Unrepeatable Reads (RW Conflicts)**
+
+```
+1. 첫 번째 트랜잭션에서 데이터 A를 조회함
+2. 두 번쨰 트랜잭션에서 데이터 A를 수정하고 commit함
+3. 첫 번째 트랜잭션에서 데이터 A를 조회하면 1번에서 조회한 결과값과 다르게 나옴
+```
+
+첫 번째 트랜잭션이 아직 데이터 A에 대한 어떠한 write 연산도 하지 않았다면, 데이터 A를 다시 조회하는 경우 이전과 같은 데이터가 조회되야한다.
+
+테스트 참고용 : https://stackoverflow.com/questions/15935891/how-to-simulate-non-repeatable-read-sql-server
+
+https://dotnettutorials.net/lesson/non-repeatable-read-concurrency-problem/
+
+> DB단에서 2PL등을 사용해 이러한 문제를 해결하지 않으면 
+> 
+> 사용자 코드를 짤 때 이러한 현상이 있을 수 있으므로 버그가 나지 않도록 주의해야한다 정도로 이해하였다.
+
+---
+![Over write](./images/overwrite.png)
+
+**Overwriting Uncommitted Data(write - write conflict)**
+
+첫 번째 트랜잭션이 아직 commit 되지 않은 상태에서 두 번째 트랜잭션이 A에 값을 덮어쓰는 경우 
+(1번 트랜잭션의 결과로 원했던 A와 실제 결과가 2번째 트랜잭션의 결과로 인해 달라지게 된다.)
 
 ---
 ### REF 
