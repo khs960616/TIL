@@ -17,7 +17,44 @@ ConcreteFlyweight형태로 만들어진 객체를 Factory를 통해 생성을 �
 ---
 ### 실제 적용된 사례
 
-- Java String Constant Pool, Wrapper Class 들의 valueOf 메서드 
+- Java String Constant Pool
+
+-  Wrapper Class 들의 valueOf 메서드들도 적용되었다고 적혀있는 글들이 있었는데 그냥 이건 일부 범위의 수를 캐싱해놓고 사용하는 것으로 보는게 맞지 않을까? 
+-  특정 구간(-128~127의 경우는 그냥 매번 새로운 객체 만들어서 뱉음)
+
+```java
+
+    // 
+   public static Integer valueOf(int i) {
+        if (i >= IntegerCache.low && i <= IntegerCache.high)
+            return IntegerCache.cache[i + (-IntegerCache.low)];
+        return new Integer(i);
+    }
+
+   public static BigInteger valueOf(long val) {
+        // If -MAX_CONSTANT < val < MAX_CONSTANT, return stashed constant
+        if (val == 0)
+            return ZERO;
+        if (val > 0 && val <= MAX_CONSTANT)
+            return posConst[(int) val];
+        else if (val < 0 && val >= -MAX_CONSTANT)
+            return negConst[(int) -val];
+
+        return new BigInteger(val);
+    }
+    
+    // 실수형의 경우는 캐싱 별도로 안하는 듯 보임 
+    public static Double valueOf(double d) {
+        return new Double(d);
+    }
+    
+    public static Float valueOf(float f) {
+        return new Float(f);
+    }
+    
+    // https://stackoverflow.com/questions/8561710/why-does-the-double-valueof-javadoc-say-it-caches-values-when-it-doesnt 
+   
+```
 
 ---
 ### REF
