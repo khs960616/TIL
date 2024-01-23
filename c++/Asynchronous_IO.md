@@ -95,3 +95,14 @@ static inline int io_fsync(io_context_t ctx, struct iocb *iocb, io_callback_t cb
 static inline int io_fdsync(io_context_t ctx, struct iocb *iocb, io_callback_t cb, int fd)
 static inline void io_set_eventfd(struct iocb *iocb, int eventfd);
 ```
+
+
+기본적인 흐름
+
+1. user space에서 aio context를 초기화 요청을 하면, 커널 모드에서 aio context를 생성하고, 생성된 context에 대한 id를 return해준다.
+   
+2. user space에서 i/o request는 iocb(io control block) 구조체로 구성하여, aio context에 submit 한다.(submit이 성공하면 성공한 갯수만큼 return해준다)
+
+3. aio context는 submit된 io 작업들을 비동기적으로 처리하며, io처리 결과를 event로 생성해서 aio_ring에 저장해서 가지고 있는다.
+
+4. user space에서 i/o request에 대한 결과를 확인하고자 할 때, getevents 함수를 호출하여 i/o 수행결과를 확인한다. 
