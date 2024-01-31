@@ -12,12 +12,14 @@ boost:intrusive::list -> Instrusive한 list를 제공한다.
 
 ## Hook
 ```
-hook: 실제 link정보를 나타내며, boost를 사용한 intrusvie list에 넣을 멤버는 list_base_hook를 가져야한다. 
+hook: 실제 link정보를 나타낸다.
 
-(list_member_hook으로 실제 멤버에서 어떤 것이 hook으로 사용되고 있는지 알 수 있다.)
+list_member_hook: (member hook은 실제, list에서 사용될 노드의 클래스의 멤버변수로 선언하는경우 사용한다.)
 
-이 때 hook에는 다양한 link mode들이 존재한다.
+list_base_hook: (base_hook은 list에서 사용될 노드의 클래스에 상속용도로 사용한다.)
 ```
+이 때 hook에는 다양한 link mode들이 존재한다.
+
 
 ## link mode
 
