@@ -22,6 +22,22 @@ interrupt를 호출하면, 스레드를 관리하는 구조체의 한 플래그�
         }
     }
 ```
+1. thread info에 대한 lock을 잡고 (실제 interrupt를 거는 주체들은 사용에 따라 다르겠으나, 높은 확률로 여러 다른 스레드에서 호출 가능하므로)
+2. interrupt_requested를 true로 변경
+3. 로컬 스레드 정보에서 조건변수 current_cond (pthread_cond_t)를 확인한다.
+4. 만약 조건 변수가 설정되어있다면, 조견변수에 대한 lock을 잡고, pthread_cond_broadcast를 호출하여 스레드를 깨운다. 
+
+```참고
+typedef struct _pthread_cond {  /* = cond_t in synch.h */
+ struct {
+  uint8_t  __pthread_cond_flag[4];
+  uint16_t  __pthread_cond_type;
+  uint16_t  __pthread_cond_magic;
+ } __pthread_cond_flags;
+ upad64_t __pthread_cond_data;
+} pthread_cond_t;
+```
+
 
 
 
