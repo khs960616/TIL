@@ -40,7 +40,7 @@ largebin[60] ~ largebin[61] (2개) : 0x40000(262,144) bytes씩 증가
 largebin[61] (1개) : 이외의 남은 크기
 ```
 
-3. fast bin
+3. fast bin 
 ```
 인접한 Chunk들끼리 병합하지 않으며, 단일 고정 크기의 Chunk들만 처리하므로 메모리 할당 / 해제가 가장 빠르다.
 
@@ -60,3 +60,9 @@ chunk size 종류 : 32, 48, 64, 80, 96, 112, 128, 144, 160, 176byte
 chunk가 해제되는 경우,
 unsorted bin에 먼저 각 chunk들을 넣은 후, 적절한 크기의 chunk를 먼저 할당한다. (일종의 캐시 역할)
 ```
+
+각 bin에 속하는 Chunk들은 크기순, 가장 오래된 순을 우선순위로 정렬된다. 
+
+---
+#### REF
+(Data Binning이란 정의된 기준에 따라 각각의 개별적인 데이터값을 저장하는 특정한 bin(구간, interval) 또는 group으로 묶는 과정을 의미한다)
