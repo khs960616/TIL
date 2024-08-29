@@ -16,3 +16,30 @@ tfo cookie등 별도 로직은 일단 배제한 설명.
 5) 실제 accpet하면, accept queue에서 해당 request_sock 뺌 & 커널 레벨에서 do_accept 호출하면서 sock 객체 생성, tcp소켓 관련 file 생성 &  유저한테 fd반환함 
 ```
 
+qlen은 싫제로 hash에 syn만 받은 request_sock들 몇개있는지 확인하는 개수이며 atomic operation으로 처리 
+
+tcp_conn_request (tcp_input.c) 쪽에서 외부에서 설정해준 sysctl_max_syn_backlog값 이용해서 패킷 드랍할지 말지 결정한다. 
+```
+		int max_syn_backlog = READ_ONCE(net->ipv4.sysctl_max_syn_backlog);
+
+		/* Kill the following clause, if you dislike this way. */
+		if (!syncookies &&
+		    (max_syn_backlog - inet_csk_reqsk_queue_len(sk) <
+		     (max_syn_backlog >> 2)) &&
+		    !tcp_peer_is_proven(req, dst)) {
+			/* Without syncookies last quarter of
+			 * backlog is filled with destinations,
+			 * proven to be alive.
+			 * It means that we continue to communicate
+			 * to destinations, already remembered
+			 * to the moment of synflood.
+			 */
+			pr_drop_req(req, ntohs(tcp_hdr(skb)->source),
+				    rsk_ops->family);
+			goto drop_and_release;
+		}
+
+		isn = af_ops->init_seq(skb);
+	}
+
+```
