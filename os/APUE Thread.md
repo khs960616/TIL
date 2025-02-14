@@ -72,3 +72,27 @@ PTHRED_THREADS_MAX: (하나의 프로세스가 생성 가능한 스레드의 최
 
 
 ## Thread Attr
+pthread 인터페이스는 스레드 객체를 세밀하게 조율할 수 있는 수단을 제공한다. 
+각 객체에 연관된 여러 attribute들이 그러한 수단이다. 
+이러한 attribute는 thread말고도, 여러 객체들이 존재하며, 각 객체들은 대체로 아래와 같은 패턴을 따른다. 
+
+1. 하나의 특성 객체가 여러 개의 특성을 대표할 수 있다. 
+2. 특성들을 기본값으로 설정하는 초기화 함수가 존재한다.
+3. 특성객체를 파괴하는 또 다른 함수가 존재하며, 초기화 함수가 특성 객체와 관련해서 자원을 할당했다면, 소멸자에서 이것을 해제한다.
+4. 각 특성마다 특성 객체로부터 특성값을 조회하는 함수가 존재한다. (return값은 인수를 통해 return되며, 실제 return value는 성공시0, 실패시 errno)
+5. 각 특성마다 특성의 값을 설정하는 함수가 존재하며, 이 경우 호출자는 그 값을 value방식의 인수를 통해 지정한다.
+
+
+
+```c
+#include <pthread.h>
+
+int pthared_attr_init(pthread_attr_t *attr);     # 구현에서 지원하는 thread의 모든 속성의 기본값이 atrr 객체에 설정된다. 
+int pthared_attr_destory(pthared_attr_t *attr);  # 특성 객체를 유효하지 않은 값으로 초기화 시켜, 재사용시 오류가 나게끔한다. 
+```
+
+스레드 속성
+detachstate : 탈착된 스레드의 특성
+guardsize : 스레드 스택 끝의 보호 버퍼 크기(바이트)
+stackaddr : 스레드 스택의 최하위 주소 
+stacksize : 스레드 스택의 최소 크기
