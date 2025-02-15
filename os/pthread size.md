@@ -113,7 +113,7 @@ tcb에 stackblock, stack size등을 기록해두고 나간다.
 
 여기쪽 코드가 grow down, up인 경우에 따라 코드 분기가 갈리고, 
 
-grow down인 경우 시작 주소 설정하는 부분은 
+grow down인 경우 시작 주소 넣어주면, 알아서 stackaddr이 스택의 시작점이 되게끔 (메모리상에서의 시작점이 아닌, 자라나는 방향 기준으로의 시작점)
 
 #if _STACK_GROWS_DOWN
   iattr->stackaddr = (char *) stackaddr + stacksize;
