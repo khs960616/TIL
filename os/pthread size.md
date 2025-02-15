@@ -84,3 +84,12 @@ struct thread_info {
 };
 
 ```
+
+--
+
+아.. 결국 posix에서 이거 어떻게 동작하려는지 보려면
+
+pthread_create -> create_thread -> allocatestack.c 이쪽 코드롤 봐야된다.. 
+
+
+https://codebrowser.dev/glibc/glibc/nptl/allocatestack.c.html#allocate_stack
