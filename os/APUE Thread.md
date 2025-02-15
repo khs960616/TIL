@@ -96,3 +96,38 @@ detachstate : 탈착된 스레드의 특성
 guardsize : 스레드 스택 끝의 보호 버퍼 크기(바이트)
 stackaddr : 스레드 스택의 최하위 주소 
 stacksize : 스레드 스택의 최소 크기
+
+
+---
+
+여기서부터는 apue에서 다루는 내용은 아니고, glibc pthread create에 달려있는 주석보면서 정리한 것임.. 차후 참고하자.
+
+---
+
+#### struct pthread 참고
+
+https://codebrowser.dev/glibc/glibc/nptl/descr.h.html#pthread 
+
+pthread관련 함수들에서 pthread의 owner가 누구인지 아는 것은 중요하다. 
+pthread_create, pthread_join, pthread_detach 및 기타 pthread 구조체를 조작하는 함수들의 정확한 동작을 결정하는 데 도움이된다.
+pthread 구조체의 owner는, 구조체와 관련한 자원을 해제해야되는 책임이 있다.
+
+
+pthread_create함수 호출 시, 해당 함수를 호출하는 스레드를 creating thread라 부르며, 
+초기에는 creating thread가 pthread 구조체의 owner가 된다. 
+(생성되는 스레드는 초기화 과정에서 owner와 협력하며 해당 구조체를 볼 수 있다.)
+
+이 pthread 구조체의 owner는 다음 4가지 케이스에서 옮겨질 수 있다.
+
+1. pthread_create로 새롭게 생성되는 thread가 joinable상태로 시작하는 경우 (pthread_create 호출이 완료되고, 유효한 pthread_t를 return하는 경우)
+   -> pthread의 소유권이 프로세스단위로 풀린다. (모든 스레드에서 사용 가능)
+
+2.  새 스레드가 detached상태로 시작하게 되면, pthread소유권은 해당 스레드에게 넘어간다. 
+
+3. pthread_detach를 호출하는 경우 (실행 중인 스레드로 동적 소유권 이전)
+
+4. pthread_join을 호출하는 경우 (pthread_join을 호출한 스레드가 소유권 획득)
+
+---
+
+
