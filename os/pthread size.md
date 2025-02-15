@@ -4,8 +4,8 @@
 ```c
 #include <pthread.h>
 
-int pthread_atrr_getstack(const pthared_attr_t *restrict attr, void **trestrict stackaddr, size_t *restrict stacksize);
-int pthread_atrr_setstack(pthared_attr_t *attr, void *stackaddr, size_t stack_size);
+int pthread_attr_getstack(const pthared_attr_t *restrict attr, void **trestrict stackaddr, size_t *restrict stacksize);
+int pthread_attr_setstack(pthared_attr_t *attr, void *stackaddr, size_t stack_size);
 
 # 두 함수 모두 성공 시 0, 실패 시 ERRNO Return
 /*
@@ -93,3 +93,30 @@ pthread_create -> create_thread -> allocatestack.c 이쪽 코드롤 봐야된다
 
 
 https://codebrowser.dev/glibc/glibc/nptl/allocatestack.c.html#allocate_stack
+
+-> 별다른 코드는 없다.. 다만 create시에 특성 객체에 stack 시작 주소 넘겼는지, 안넘겼는지에 따라 코드 분기가 달라진다. 
+
+시작 주소를 준 경우에는 mmap이나, guard page설정등의 작업을 일절하지 않는다. (사용자 코드에서 알아서 하는 것을 전제로함)
+
+이 내부에서도 
+```
+tls_static_size_for_stack 
+
+/* Minimal stack size after allocating thread descriptor and guard size.  */
+#define MINIMAL_REST_STACK 2048
+```
+아래 두가지값으로 stack size 검증한번 더 함. 
+
+그리고 owner(pthread_create caller)로부터 넘겨받은 pthread (TCB)객체를 thread의 stack공간에 memcpy해둔다. 
+
+tcb에 stackblock, stack size등을 기록해두고 나간다.
+
+여기쪽 코드가 grow down, up인 경우에 따라 코드 분기가 갈리고, 
+
+grow down인 경우 시작 주소 설정하는 부분은 
+
+#if _STACK_GROWS_DOWN
+  iattr->stackaddr = (char *) stackaddr + stacksize;
+#else 
+
+attr설정하는 클래스들 코드쪽에 있어서, 매우 헷갈리니 주의해서 보자. 
