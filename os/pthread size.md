@@ -107,9 +107,9 @@ tls_static_size_for_stack
 ```
 아래 두가지값으로 stack size 검증한번 더 함. 
 
-그리고 owner(pthread_create caller)로부터 넘겨받은 pthread (TCB)객체를 thread의 stack공간에 memcpy해둔다. 
-
-tcb에 stackblock, stack size등을 기록해두고 나간다.
+pthread (TCB)객체가 thread의 stack공간에 위치할곳을, pthread struct 만큼 0으로 초기화 해놓는다.
+(이때 call쪽에서 달아둔 pdp포인터에, 이 tcb의 위치를 저장해서 pthread_create등의 함수에서 해당 위치를 알수있게해준다.)
+(tcb에 stackblock, stack size등은 allocated stack안에서 설정해준다)
 
 여기쪽 코드가 grow down, up인 경우에 따라 코드 분기가 갈리고, 
 
