@@ -114,6 +114,8 @@ pthread (thread descriptor)객체가 thread의 stack공간에 위치할곳을, p
 (tcb에 stackblock, stack size등은 allocated stack안에서 설정해준다) 
 
 // TLS_TCB_AT_TP 켜져있는 경우, pthread->header.tcb에  tls를 위해 pd객체 자체를 달아놓는데,
+// TLS_DTV_AT_TP인 경우 애초에 tcbhead_t 자체를 두지 않고 별도 header 객체를 가진다. 
+
 // tls쪽 코드 봤을땐 두개를 완전하게 동일한 개념으로 보면 안될듯하다. 
 
 여기쪽 코드가 grow down, up인 경우에 따라 코드 분기가 갈리고, 
