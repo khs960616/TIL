@@ -107,9 +107,14 @@ tls_static_size_for_stack
 ```
 아래 두가지값으로 stack size 검증한번 더 함. 
 
-pthread (TCB)객체가 thread의 stack공간에 위치할곳을, pthread struct 만큼 0으로 초기화 해놓는다.
+
+
+pthread (thread descriptor)객체가 thread의 stack공간에 위치할곳을, pthread struct 만큼 0으로 초기화 해놓는다.
 (이때 call쪽에서 달아둔 pdp포인터에, 이 tcb의 위치를 저장해서 pthread_create등의 함수에서 해당 위치를 알수있게해준다.)
-(tcb에 stackblock, stack size등은 allocated stack안에서 설정해준다)
+(tcb에 stackblock, stack size등은 allocated stack안에서 설정해준다) 
+
+// TLS_TCB_AT_TP 켜져있는 경우, pthread->header.tcb에  tls를 위해 pd객체 자체를 달아놓는데,
+// tls쪽 코드 봤을땐 두개를 완전하게 동일한 개념으로 보면 안될듯하다. 
 
 여기쪽 코드가 grow down, up인 경우에 따라 코드 분기가 갈리고, 
 
