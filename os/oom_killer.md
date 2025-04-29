@@ -378,4 +378,5 @@ os message상에  oom killer가 동작했을때 프로세스들에 대한 정보
 ```
 
 아 == 또 4.19부터는 
-oom_evaluate_task이거로 쓰는거같음 == 다시 코드 검토하고 내용 추가하자. 
+~~oom_evaluate_task이거로 쓰는거같음 == 다시 코드 검토하고 내용 추가하자.~~
+어쩌피 그 안에서 badness로 score 매기네, 더 디테일한 부분은 필요할때 더 보자.  
