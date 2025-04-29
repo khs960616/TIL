@@ -8,6 +8,36 @@
 이는 프로세스의 메모리 사용량, 프로세스 우선순위등을 데몬 내부적으로 사용하여 계산한다.
 oom_badness() 함수를 통해 게산하며 0~1000사이 값으로 계산되며 OOM Score가 높을수록 우선순위가 높아진다. 
 
+```c
+# mm = memory management 
+# RSS(Resident Set Size) = 실제 메모리에 적재된 페이지 수 × 페이지 크기(보통 4KB)
+	points = get_mm_rss(p->mm) + get_mm_counter(p->mm, MM_SWAPENTS) +
+		mm_pgtables_bytes(p->mm) / PAGE_SIZE;
+	task_unlock(p);
+
+	/* Normalize to oom_score_adj units */
+	adj *= totalpages / 1000;
+	points += adj;
+
+	/*
+	 * Never return 0 for an eligible task regardless of the root bonus and
+	 * oom_score_adj (oom_score_adj can't be OOM_SCORE_ADJ_MIN here).
+	 */
+	return points > 0 ? points : 1;
+```
+
+```c
+# mm_rss는 아래의 값들의 합이다. 
+# mm_count는 mm구조체에 존재하는 값들을 atomic하게 읽어오는 function임 
+# atomic_long_read(&mm->rss_stat.count[member]);
+
+	return get_mm_counter(mm, MM_FILEPAGES) +
+		get_mm_counter(mm, MM_ANONPAGES) +
+		get_mm_counter(mm, MM_SHMEMPAGES);
+```
+
+
+
 oom_badness 메소드의 순위 선정 방법 (코드 분석전 자료 조사) 
 1. 특정 프로세스를 죽임으로써, 최소한 양의 프로세스만 잃어야한다.
 2. 많은 메모리를 회수할 수 있어야한다.
