@@ -98,6 +98,20 @@ NR_MM_COUNTERS → 이건 그냥 enum 마지막을 뜻하는 녀석
 /*
  * The caller must write-lock current->mm->mmap_lock.
  */
+
+/*
+   file: 매핑할 파일을 가리키는 포인터, 익명 메모리 mapping인 경우 NULL로 들어온다.
+   addr: 명시적으로 가상 메모리 주소를 넘겨준 경우에 사용되며, 넘겨주지 않은 경우 NULL로 들어오며, 커널레벨에서 알아서 virtual memory 상에 mmaping한다.
+   len: 할당할 사이즈 
+   prot: 권한 (PROT_READ, PROT_WRITE, PROT_EXEC, PROT_NONE) 등 호출 시 넘겨준 정보
+   flags: MAP_SHARED, MAP_PRIVATE, MAP_FIXED 등 호출시 넘겨줬던 flag정보 
+   vm_flags: 맵핑에 대한 가상메모리 정보라 함, 뭔지는 나중에 더 봐야알듯.. 
+   pgoff: 주로 파일 맵핑하는 경우, 맵핑할 오프셋(파일에서의) 을 설정할때 사용됨
+   populate: 맵핑하면서 페이지를 미리 할당할지 여부를 결정하는 인자 (MAP_POPULATE 와 연관된 녀석인듯 리눅스 2.6.23부터 지원 시작) 
+   uf: 뭔지 모르겠음 
+*/
+
+
 unsigned long do_mmap(struct file *file, unsigned long addr,
 			unsigned long len, unsigned long prot,
 			unsigned long flags, vm_flags_t vm_flags,
@@ -108,7 +122,7 @@ unsigned long do_mmap(struct file *file, unsigned long addr,
 	int pkey = 0;
 
 	*populate = 0;
-
+         
 	if (!len)
 		return -EINVAL;
 
