@@ -122,7 +122,8 @@ unsigned long do_mmap(struct file *file, unsigned long addr,
 	int pkey = 0;
 
 	*populate = 0;
-         
+
+        // 크기를 0으로 주는 경우 오류 발생 (음수는?) 
 	if (!len)
 		return -EINVAL;
 
@@ -132,9 +133,15 @@ unsigned long do_mmap(struct file *file, unsigned long addr,
 	 * (the exception is when the underlying filesystem is noexec
 	 *  mounted, in which case we don't add PROT_EXEC.)
 	 */
+        // 읽기 권한 설정 && 읽기 권한 -> 실행권한으로 확장 가능하며 && file이 주어졌고, file이 올바른 경로로 주어진 경우 권한을 추가해준다.
 	if ((prot & PROT_READ) && (current->personality & READ_IMPLIES_EXEC))
 		if (!(file && path_noexec(&file->f_path)))
 			prot |= PROT_EXEC;
+
+        /*MAP_FIXED vs MAP_FIXED_NOREPLACE  
+        MAP_FIXED: 주소를 넘겨준 경우 무조건 해당 virtual address상에 새롭게 맵핑한다. (기존 영역이 존재했다면 강제로 밀어버림)
+        MAP_FIXED_NOREPLACE: 지정된 주소에 이미 매핑이 있으면 실패하고, ENOMEM을 반환한다. 
+        */
 
 	/* force arch specific MAP_FIXED handling in get_unmapped_area */
 	if (flags & MAP_FIXED_NOREPLACE)
