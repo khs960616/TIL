@@ -341,4 +341,10 @@ unsigned long do_mmap(struct file *file, unsigned long addr,
 }
 ```
 
+redhet기준 (버전 몇이지... 분석전에좀 알려주면 좋겠다...) 
 
+os message상에  oom killer가 동작했을때 프로세스들에 대한 정보가 다 떨어져있음.
+
+다만, rss나 swap의 경우 shared memory도 포함하기 때문에 완벽하게 정확하게 사용량을 유추하긴 어렵긴하지만, 대략적으로 계산은 가능함 
+
+(oom_badness의 경우 rss, swap, pgtable_bytes 다 찍혀있어서 계산하기 편함) 
