@@ -39,6 +39,29 @@ sk_buff 구조체는 패킷을 표현하는 구조체 형태
 (/proc/sys/net/core/wmem_default, /proc/sys/net/core/rmem_default 설정된값) 
 https://elixir.bootlin.com/linux/v6.12.1/source/net/core/sock.c#L2478 
 
-sk_wmem_queued + 추가되려는 사이즈가 결국에 설정된값들을 초과하는지 체크하는게 전부임 
+현재까지 alloc된 사이즈랑 snd_buf 설정값을 비교하는구나.. 그리고 wait하러들어감 
 
+```c
+	for (;;) {
+		err = sock_error(sk);
+		if (err != 0)
+			goto failure;
+
+		err = -EPIPE;
+		if (READ_ONCE(sk->sk_shutdown) & SEND_SHUTDOWN)
+			goto failure;
+
+		if (sk_wmem_alloc_get(sk) < READ_ONCE(sk->sk_sndbuf))
+			break;
+
+		sk_set_bit(SOCKWQ_ASYNC_NOSPACE, sk);
+		set_bit(SOCK_NOSPACE, &sk->sk_socket->flags);
+		err = -EAGAIN;
+		if (!timeo)
+			goto failure;
+		if (signal_pending(current))
+			goto interrupted;
+		timeo = sock_wait_for_wmem(sk, timeo);
+	}
+```
 
