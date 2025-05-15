@@ -31,6 +31,11 @@ static struct sock *unix_create1(struct net *net, struct socket *sock, int kern,
        	sk->sk_rcvbuf		=	READ_ONCE(sysctl_rmem_default);
 	      sk->sk_sndbuf		=	READ_ONCE(sysctl_wmem_default);  여기서 가져온다 
 
+
+sk_buff_head -> sock객체에 있는 큐들의 형태 (양방향 링크드 리스트 표현용 + lock)
+
+sk_buff 구조체는 패킷을 표현하는 구조체 형태 
+
 (/proc/sys/net/core/wmem_default, /proc/sys/net/core/rmem_default 설정된값) 
 https://elixir.bootlin.com/linux/v6.12.1/source/net/core/sock.c#L2478 
 
