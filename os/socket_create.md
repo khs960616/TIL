@@ -1,3 +1,6 @@
+근본적으로는 unix domain socket 설정 시, 개별 소켓별 커널영역의 버퍼를 어느정도 먹는지 체크하기 위함
+(커널 파라미터별로는 별도로 알아서 고려할것, setsockopt등의 옵션에서 send, rcv버퍼크기 설정의 경우, 2배 설정 또는 커널내부에서 알아서 처리한다
+(맨페이지에 적혀있는 내용인데, 이거 뭐 필요하면 코드 체크하자 일단은 메모리 할당량만 어느정도 잡힐지 추산)
 
 ## struct socket
 vfs 계층의 업무 처리, inode 할당 & iattr설정등의 역할  (inode attribute)
@@ -20,3 +23,15 @@ sockfs_setattr(struct mnt_idmap *idmap,
 (uds의 경우 af_unix.c 쪽에 인터페이스에 들어갈 함수들 정의되어있으니 체크) 
 
 static struct sock *unix_create1(struct net *net, struct socket *sock, int kern, int type)
+-> sk_alloc이후에, 
+-> sock_init_data(sock, sk);
+  -> sock_init_data_uid
+    ->  sk_init_common: 송신큐, 수신큐, 에러큐, lock 관련 설정 (별도 프로토콜 종속적인 내용은 여기선 없다)
+    -> 이후에 
+       	sk->sk_rcvbuf		=	READ_ONCE(sysctl_rmem_default);
+	      sk->sk_sndbuf		=	READ_ONCE(sysctl_wmem_default);  여기서 가져온다 
+
+(/proc/sys/net/core/wmem_default, /proc/sys/net/core/rmem_default 설정된값) 
+https://elixir.bootlin.com/linux/v6.12.1/source/net/core/sock.c#L2478 
+
+
