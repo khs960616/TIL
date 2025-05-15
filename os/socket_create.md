@@ -39,4 +39,6 @@ sk_buff 구조체는 패킷을 표현하는 구조체 형태
 (/proc/sys/net/core/wmem_default, /proc/sys/net/core/rmem_default 설정된값) 
 https://elixir.bootlin.com/linux/v6.12.1/source/net/core/sock.c#L2478 
 
+sk_wmem_queued + 추가되려는 사이즈가 결국에 설정된값들을 초과하는지 체크하는게 전부임 
+
 
