@@ -65,3 +65,15 @@ https://elixir.bootlin.com/linux/v6.12.1/source/net/core/sock.c#L2478
 	}
 ```
 
+결론
+- 단순 소켓 생성 개수만으로는 버퍼값 설정으로 인한 메모리 사용량을 걱정할 필요는 없을 것이다.
+- 리눅스 계열 os 사용시 네트워크 bandwidth이 좁거나, 지연이 심한 환경에서 각 값들을 비정상적으로 크게 잡아두는 경우 불필요하게 메모리 낭비가 생길 것 같긴함.
+
+- 코드 보기 전까진 책이나 강의들에서 그림그려서 설명하는거만 보고 소켓별로 설정된 버퍼크기만큼 할당해놓고, 
+  copy from user로 kernal 영역 버퍼로 copy해놓은 후, 이후 패킷 단위로 끊어서 보내는줄 알았음
+  일단은 6버전 위로는 그렇게 동작 안하고 있음 (recvq, sendq 자체는 아직 처리되지 못한 sk_buff들이 달려있는 양방향 링크드 리스트고, 각 SO_RCVBUF등으로 설정한 값들은
+  여기에 sk_buff를 최대 얼마까지 쌓아둘수있는지 allocated 되는 양을 제어함, 그리고 유저레벨에서 전달받은 msg는 sk_buff가 할당 가능한 시점에, copy 가능한 양만큼씩 copy됨
+
+- 부가적으로... socket == vfs 및 proto faimliy등의 handler를 다루는 layer, sock == 실제 소켓관련 인터페이스들 제공,  sk_buff 소켓 버퍼 
+  (전송하려는 메시지가 패킷 단위로 끊어져 있는 형태, slab alloc을 통해 가져옴) 참고로 위에 코드관련 내용들은 sock에서 generic handler 및 af_unix만 보고 보고 적어둔 것이다. 
+  -> proto family 내용이 필요하다면 경우에 따라 ipv4, ipv6, af_unix, udp 등등.. 필요한 쪽 가서 코드 찾아야됨
