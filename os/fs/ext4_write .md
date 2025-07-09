@@ -122,6 +122,7 @@ again:
 			break;
 		}
 
+                // 여기가 페이지 캐시 확보하는 부분 
 		status = a_ops->write_begin(file, mapping, pos, bytes, flags,
 						&page, &fsdata);
 		if (unlikely(status < 0))
@@ -130,9 +131,11 @@ again:
 		if (mapping_writably_mapped(mapping))
 			flush_dcache_page(page);
 
+                // user로부터 넘어온 buffer 데이터를 페이지에 copy한다. 
 		copied = iov_iter_copy_from_user_atomic(page, i, offset, bytes);
 		flush_dcache_page(page);
 
+                // dirty 페이지 마크 
 		status = a_ops->write_end(file, mapping, pos, bytes, copied,
 						page, fsdata);
 		if (unlikely(status < 0))
