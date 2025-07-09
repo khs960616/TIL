@@ -168,4 +168,266 @@ again:
 }
 ```
 
+일단 page캐시쪽에 copy하는건 fs에 종속적이지 않으니 이거부터 메모 
+```c
+size_t iov_iter_copy_from_user_atomic(struct page *page,
+		struct iov_iter *i, unsigned long offset, size_t bytes)
+{
+	char *kaddr = kmap_atomic(page), *p = kaddr + offset;
+	if (unlikely(!page_copy_sane(page, offset, bytes))) {
+		kunmap_atomic(kaddr);
+		return 0;
+	}
+	if (unlikely(iov_iter_is_pipe(i) || iov_iter_is_discard(i))) {
+		kunmap_atomic(kaddr);
+		WARN_ON(1);
+		return 0;
+	}
+	iterate_all_kinds(i, bytes, v,
+		copyin((p += v.iov_len) - v.iov_len, v.iov_base, v.iov_len),
+		memcpy_from_page((p += v.bv_len) - v.bv_len, v.bv_page,
+				 v.bv_offset, v.bv_len),
+		memcpy((p += v.iov_len) - v.iov_len, v.iov_base, v.iov_len)
+	)
+	kunmap_atomic(kaddr);
+	return bytes;
+}
+```
+
+
+각각의 operation도 fs별 inode 구현에 있는 것으로 보인다.
+
+fs/ext4/inode.c 
+
+```c
+static const struct address_space_operations ext4_aops = {
+	.readpage		= ext4_readpage,
+	.readahead		= ext4_readahead,
+	.writepage		= ext4_writepage,
+	.writepages		= ext4_writepages,
+	.write_begin		= ext4_write_begin,
+	.write_end		= ext4_write_end,
+	.set_page_dirty		= ext4_set_page_dirty,
+	.bmap			= ext4_bmap,
+	.invalidatepage		= ext4_invalidatepage,
+	.releasepage		= ext4_releasepage,
+	.direct_IO		= noop_direct_IO,
+	.migratepage		= buffer_migrate_page,
+	.is_partially_uptodate  = block_is_partially_uptodate,
+	.error_remove_page	= generic_error_remove_page,
+	.swap_activate		= ext4_iomap_swap_activate,
+};
+
+
+static int ext4_write_begin(struct file *file, struct address_space *mapping,
+			    loff_t pos, unsigned len, unsigned flags,
+			    struct page **pagep, void **fsdata)
+{
+	struct inode *inode = mapping->host;
+	int ret, needed_blocks;
+	handle_t *handle;
+	int retries = 0;
+	struct page *page;
+	pgoff_t index;
+	unsigned from, to;
+
+	if (unlikely(ext4_forced_shutdown(EXT4_SB(inode->i_sb))))
+		return -EIO;
+
+	trace_ext4_write_begin(inode, pos, len, flags);
+	/*
+	 * Reserve one block more for addition to orphan list in case
+	 * we allocate blocks but write fails for some reason
+	 */
+	needed_blocks = ext4_writepage_trans_blocks(inode) + 1;
+	index = pos >> PAGE_SHIFT;
+	from = pos & (PAGE_SIZE - 1);
+	to = from + len;
+
+	if (ext4_test_inode_state(inode, EXT4_STATE_MAY_INLINE_DATA)) {
+		ret = ext4_try_to_write_inline_data(mapping, inode, pos, len,
+						    flags, pagep);
+		if (ret < 0)
+			return ret;
+		if (ret == 1)
+			return 0;
+	}
+
+	/*
+	 * grab_cache_page_write_begin() can take a long time if the
+	 * system is thrashing due to memory pressure, or if the page
+	 * is being written back.  So grab it first before we start
+	 * the transaction handle.  This also allows us to allocate
+	 * the page (if needed) without using GFP_NOFS.
+	 */
+retry_grab:
+	page = grab_cache_page_write_begin(mapping, index, flags);
+	if (!page)
+		return -ENOMEM;
+	/*
+	 * The same as page allocation, we prealloc buffer heads before
+	 * starting the handle.
+	 */
+	if (!page_has_buffers(page))
+		create_empty_buffers(page, inode->i_sb->s_blocksize, 0);
+
+	unlock_page(page);
+
+retry_journal:
+	handle = ext4_journal_start(inode, EXT4_HT_WRITE_PAGE, needed_blocks);
+	if (IS_ERR(handle)) {
+		put_page(page);
+		return PTR_ERR(handle);
+	}
+
+	lock_page(page);
+	if (page->mapping != mapping) {
+		/* The page got truncated from under us */
+		unlock_page(page);
+		put_page(page);
+		ext4_journal_stop(handle);
+		goto retry_grab;
+	}
+	/* In case writeback began while the page was unlocked */
+	wait_for_stable_page(page);
+
+#ifdef CONFIG_FS_ENCRYPTION
+	if (ext4_should_dioread_nolock(inode))
+		ret = ext4_block_write_begin(page, pos, len,
+					     ext4_get_block_unwritten);
+	else
+		ret = ext4_block_write_begin(page, pos, len,
+					     ext4_get_block);
+#else
+	if (ext4_should_dioread_nolock(inode))
+		ret = __block_write_begin(page, pos, len,
+					  ext4_get_block_unwritten);
+	else
+		ret = __block_write_begin(page, pos, len, ext4_get_block);
+#endif
+	if (!ret && ext4_should_journal_data(inode)) {
+		ret = ext4_walk_page_buffers(handle, page_buffers(page),
+					     from, to, NULL,
+					     do_journal_get_write_access);
+	}
+
+	if (ret) {
+		bool extended = (pos + len > inode->i_size) &&
+				!ext4_verity_in_progress(inode);
+
+		unlock_page(page);
+		/*
+		 * __block_write_begin may have instantiated a few blocks
+		 * outside i_size.  Trim these off again. Don't need
+		 * i_size_read because we hold i_mutex.
+		 *
+		 * Add inode to orphan list in case we crash before
+		 * truncate finishes
+		 */
+		if (extended && ext4_can_truncate(inode))
+			ext4_orphan_add(handle, inode);
+
+		ext4_journal_stop(handle);
+		if (extended) {
+			ext4_truncate_failed_write(inode);
+			/*
+			 * If truncate failed early the inode might
+			 * still be on the orphan list; we need to
+			 * make sure the inode is removed from the
+			 * orphan list in that case.
+			 */
+			if (inode->i_nlink)
+				ext4_orphan_del(NULL, inode);
+		}
+
+		if (ret == -ENOSPC &&
+		    ext4_should_retry_alloc(inode->i_sb, &retries))
+			goto retry_journal;
+		put_page(page);
+		return ret;
+	}
+	*pagep = page;
+	return ret;
+}
+
+
+static int ext4_write_end(struct file *file,
+			  struct address_space *mapping,
+			  loff_t pos, unsigned len, unsigned copied,
+			  struct page *page, void *fsdata)
+{
+	handle_t *handle = ext4_journal_current_handle();
+	struct inode *inode = mapping->host;
+	loff_t old_size = inode->i_size;
+	int ret = 0, ret2;
+	int i_size_changed = 0;
+	int inline_data = ext4_has_inline_data(inode);
+	bool verity = ext4_verity_in_progress(inode);
+
+	trace_ext4_write_end(inode, pos, len, copied);
+	if (inline_data &&
+	    ext4_test_inode_state(inode, EXT4_STATE_MAY_INLINE_DATA)) {
+		ret = ext4_write_inline_data_end(inode, pos, len,
+						 copied, page);
+		if (ret < 0) {
+			unlock_page(page);
+			put_page(page);
+			goto errout;
+		}
+		copied = ret;
+		ret = 0;
+	} else
+		copied = block_write_end(file, mapping, pos,
+					 len, copied, page, fsdata);
+	/*
+	 * it's important to update i_size while still holding page lock:
+	 * page writeout could otherwise come in and zero beyond i_size.
+	 *
+	 * If FS_IOC_ENABLE_VERITY is running on this inode, then Merkle tree
+	 * blocks are being written past EOF, so skip the i_size update.
+	 */
+	if (!verity)
+		i_size_changed = ext4_update_inode_size(inode, pos + copied);
+	unlock_page(page);
+	put_page(page);
+
+	if (old_size < pos && !verity)
+		pagecache_isize_extended(inode, old_size, pos);
+	/*
+	 * Don't mark the inode dirty under page lock. First, it unnecessarily
+	 * makes the holding time of page lock longer. Second, it forces lock
+	 * ordering of page lock and transaction start for journaling
+	 * filesystems.
+	 */
+	if (i_size_changed || inline_data)
+		ret = ext4_mark_inode_dirty(handle, inode);
+
+errout:
+	if (pos + len > inode->i_size && !verity && ext4_can_truncate(inode))
+		/* if we have allocated more blocks and copied
+		 * less. We will have blocks allocated outside
+		 * inode->i_size. So truncate them
+		 */
+		ext4_orphan_add(handle, inode);
+
+	ret2 = ext4_journal_stop(handle);
+	if (!ret)
+		ret = ret2;
+
+	if (pos + len > inode->i_size && !verity) {
+		ext4_truncate_failed_write(inode);
+		/*
+		 * If truncate failed early the inode might still be
+		 * on the orphan list; we need to make sure the inode
+		 * is removed from the orphan list in that case.
+		 */
+		if (inode->i_nlink)
+			ext4_orphan_del(NULL, inode);
+	}
+
+	return ret ? ret : copied;
+}
+
+```
+
 
