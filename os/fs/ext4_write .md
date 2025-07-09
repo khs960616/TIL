@@ -70,6 +70,7 @@ out:
 	inode_unlock(inode);
 	if (likely(ret > 0)) {
 		iocb->ki_pos += ret;
+                // sync 옵션 걸어둔 경우 
 		ret = generic_write_sync(iocb, ret);
 	}
 
