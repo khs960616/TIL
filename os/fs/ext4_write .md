@@ -59,14 +59,14 @@ static ssize_t ext4_buffered_write_iter(struct kiocb *iocb,
 	if (iocb->ki_flags & IOCB_NOWAIT)
 		return -EOPNOTSUPP;
 
-	inode_lock(inode);
-	ret = ext4_write_checks(iocb, from);
+	inode_lock(inode); // inode에 대한 Lock! -> 멀티 스레드 써봤자 도움안됨 
+	ret = ext4_write_checks(iocb, from); //validation이랑, iov_iter에 크기를 실제 write할수있는 바이트수만큼으로 조절 
 	if (ret <= 0)
 		goto out;
-
-	current->backing_dev_info = inode_to_bdi(inode);
-	ret = generic_perform_write(iocb->ki_filp, from, iocb->ki_pos);
-	current->backing_dev_info = NULL;
+        
+	current->backing_dev_info = inode_to_bdi(inode); //프로세스에다가 현재 접근하려고 하는 블록 디바이스 정보를 적어놓음 
+	ret = generic_perform_write(iocb->ki_filp, from, iocb->ki_pos); 
+	current->backing_dev_info = NULL;  // 이후에 NULL로 값을 잘 닦는다. 
 
 out:
 	inode_unlock(inode);
@@ -80,8 +80,7 @@ out:
 }
 ```
 
-
-페이지 캐시에 내려놓는건 일단 다 이걸 타나보네?  커널 5버전부턴 일단 mm/filemap.c에 정의되어있음 
+커널 5버전부턴 일단 mm/filemap.c에 정의
 
 ```c
 ssize_t generic_perform_write(struct file *file,
