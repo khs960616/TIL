@@ -27,9 +27,11 @@ write
 ```c
 static ssize_t
 ext4_file_write_iter(struct kiocb *iocb, struct iov_iter *from)
-{
+{       
+        // iocb에 있는 file pointer에 대응되는 실제 inode 포인터를 가져온다. 
 	struct inode *inode = file_inode(iocb->ki_filp);
 
+        // 이 inode가 속한 파일시스템이 맛탱이가 간 경우 
 	if (unlikely(ext4_forced_shutdown(EXT4_SB(inode->i_sb))))
 		return -EIO;
 
@@ -37,10 +39,10 @@ ext4_file_write_iter(struct kiocb *iocb, struct iov_iter *from)
 	if (IS_DAX(inode))
 		return ext4_dax_write_iter(iocb, from);
 #endif
-  // O_DIRECT 켜서 연 경우, 
+        // O_DIRECT 켜서 연 경우, 
 	if (iocb->ki_flags & IOCB_DIRECT)
 		return ext4_dio_write_iter(iocb, from);
-	else // 아닌 경우 
+	else // 아닌 경우는 buffer_io! 
 		return ext4_buffered_write_iter(iocb, from);
 }
 ```
