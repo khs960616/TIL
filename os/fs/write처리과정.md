@@ -240,8 +240,8 @@ static inline ssize_t call_write_iter(struct file *file, struct kiocb *kio,
 {
 	return file->f_op->write_iter(kio, iter);
 }
-결국에 writev류를 호출해서 처리하게된다. 
+// 결국에 writev류를 호출해서 처리하게된다. 
 ```
 
-
+이후 과정은 https://github.com/khs960616/TIL/blob/main/os/fs/ext4_write%20.md 를 참고!
 
