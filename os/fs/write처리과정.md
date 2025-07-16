@@ -110,17 +110,9 @@ ssize_t vfs_write(struct file *file, const char __user *buf, size_t count, loff_
 	file_start_write(file);
   
 	if (file->f_op->write)
-		ret = file->f_op->write(file, buf, count, pos);   //이걸 기준으로 보면된다. 
+		ret = file->f_op->write(file, buf, count, pos);  
 	else if (file->f_op->write_iter)
 		ret = new_sync_write(file, buf, count, pos); // 파일시스템 자체적으로 write함수는 구현안해놓고 writev류 함수만 구현해놨으면 buffer를 iov_iter로 말아서 처리함
- /*
-ssize_t new_sync_write(struct file *file, const char __user *buf, size_t count, loff_t pos)
-{
-    struct iov_iter iter;
-    init_sync_write_iter(&iter, buf, count);
-    return file->f_op->write_iter(file, &iter);
-}
-*/
 	else
 		ret = -EINVAL;
 	if (ret > 0) {
@@ -156,4 +148,100 @@ static inline void __sb_start_write(struct super_block *sb, int level)
 }
 ```
 
-이러면.. 이제 또 개별 파일시스템별꺼로 봐야되는데 ext4기준으로 보자 
+
+이러면.. 이제 또 개별 파일시스템별꺼로 봐야되는데 ext4기준으로 보자, 나중에 시간되면 VFS까지는 봐두면 좋긴할꺼같은데; 일단은 
+
+```c
+// 인터페이스에 write함수 구현이 없는걸 보면, 일단은 writev류 함수를 써서 처리됨 
+
+const struct file_operations ext4_file_operations = {
+	.llseek		= ext4_llseek,
+	.read_iter	= ext4_file_read_iter,
+	.write_iter	= ext4_file_write_iter,
+	.iopoll		= iomap_dio_iopoll,
+	.unlocked_ioctl = ext4_ioctl,
+#ifdef CONFIG_COMPAT
+	.compat_ioctl	= ext4_compat_ioctl,
+#endif
+	.mmap		= ext4_file_mmap,
+	.mmap_supported_flags = MAP_SYNC,
+	.open		= ext4_file_open,
+	.release	= ext4_release_file,
+	.fsync		= ext4_sync_file,
+	.get_unmapped_area = thp_get_unmapped_area,
+	.splice_read	= generic_file_splice_read,
+	.splice_write	= iter_file_splice_write,
+	.fallocate	= ext4_fallocate,
+};
+
+const struct inode_operations ext4_file_inode_operations = {
+	.setattr	= ext4_setattr,
+	.getattr	= ext4_file_getattr,
+	.listxattr	= ext4_listxattr,
+	.get_acl	= ext4_get_acl,
+	.set_acl	= ext4_set_acl,
+	.fiemap		= ext4_fiemap,
+};
+```
+
+보기전에 먼저 (aio아니면 무조건 이거로 불린다, sync가 디스크에 실제 데이터가 동기화되는걸 의미하는게 아님, 유저레벨에서 커널 작업이 끝날때까지 기다리는지 여부 
+```c
+static ssize_t new_sync_write(struct file *filp, const char __user *buf, size_t len, loff_t *ppos)
+{
+	struct iovec iov = { .iov_base = (void __user *)buf, .iov_len = len };
+	struct kiocb kiocb;
+	struct iov_iter iter;
+	ssize_t ret;
+       
+	init_sync_kiocb(&kiocb, filp);
+	kiocb.ki_pos = (ppos ? *ppos : 0);
+	iov_iter_init(&iter, WRITE, &iov, 1, len);
+         
+	ret = call_write_iter(filp, &kiocb, &iter);
+	BUG_ON(ret == -EIOCBQUEUED);
+	if (ret > 0 && ppos)
+		*ppos = kiocb.ki_pos;
+	return ret;
+}
+
+// 필요한 구조체들 초기화 
+static inline void init_sync_kiocb(struct kiocb *kiocb, struct file *filp)
+{
+	*kiocb = (struct kiocb) {
+		.ki_filp = filp,
+		.ki_flags = iocb_flags(filp),
+		.ki_hint = ki_hint_validate(file_write_hint(filp)),
+		.ki_ioprio = get_current_ioprio(),
+	};
+}
+
+void iov_iter_init(struct iov_iter *i, unsigned int direction,
+			const struct iovec *iov, unsigned long nr_segs,
+			size_t count)
+{
+	WARN_ON(direction & ~(READ | WRITE));
+	direction &= READ | WRITE;
+
+	/* It will get better.  Eventually... */
+	if (uaccess_kernel()) {
+		i->type = ITER_KVEC | direction;
+		i->kvec = (struct kvec *)iov;
+	} else {
+		i->type = ITER_IOVEC | direction;
+		i->iov = iov;
+	}
+	i->nr_segs = nr_segs;
+	i->iov_offset = 0;
+	i->count = count;
+}
+
+static inline ssize_t call_write_iter(struct file *file, struct kiocb *kio,
+				      struct iov_iter *iter)
+{
+	return file->f_op->write_iter(kio, iter);
+}
+결국에 writev류를 호출해서 처리하게된다. 
+```
+
+
+
