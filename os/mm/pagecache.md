@@ -70,7 +70,7 @@ no_page:
 		if (fgp_flags & FGP_NOFS)
 			gfp_mask &= ~__GFP_FS;
 
-		page = __page_cache_alloc(gfp_mask);
+		page = __page_cache_alloc(gfp_mask); // 페이지 새로 할당
 		if (!page)
 			return NULL;
 
