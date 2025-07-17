@@ -396,4 +396,36 @@ void create_empty_buffers(struct page *page,
 	attach_page_private(page, head);
 	spin_unlock(&page->mapping->private_lock);
 }
+
+// slab을 통해 buffer_head를 새로 할당받는다.
+struct buffer_head *alloc_buffer_head(gfp_t gfp_flags)
+{
+	struct buffer_head *ret = kmem_cache_zalloc(bh_cachep, gfp_flags);
+	if (ret) {
+		INIT_LIST_HEAD(&ret->b_assoc_buffers);
+		spin_lock_init(&ret->b_uptodate_lock);
+		preempt_disable();
+		__this_cpu_inc(bh_accounting.nr);
+		recalc_bh_state();
+		preempt_enable();
+	}
+	return ret;
+}
+
+
+void set_bh_page(struct buffer_head *bh,
+		struct page *page, unsigned long offset)
+{
+	bh->b_page = page;
+	BUG_ON(offset >= PAGE_SIZE);
+	if (PageHighMem(page))
+		/*
+		 * This catches illegal uses and preserves the offset:
+		 */
+		bh->b_data = (char *)(0 + offset);
+	else
+		bh->b_data = page_address(page) + offset;
+}
+EXPORT_SYMBOL(set_bh_page);
+
 ```
