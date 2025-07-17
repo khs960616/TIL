@@ -352,7 +352,7 @@ struct {
     struct list_head lru;
     struct address_space *mapping;
     pgoff_t index;
-    unsigned long private;
+    unsigned long private;   // 페이지 캐시 목적으로 사용되고 있다면, 여기에  buffer head의 주소가 저장되있다.
 };
 ```
 
