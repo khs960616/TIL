@@ -150,6 +150,7 @@ again:
 		if (unlikely(status < 0))
 			break;
 
+                // cpu <-> main memory간에 동기화를 위한 flush임.
 		if (mapping_writably_mapped(mapping))
 			flush_dcache_page(page);
 
