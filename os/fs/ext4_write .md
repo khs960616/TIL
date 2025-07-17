@@ -165,9 +165,9 @@ again:
 			break;
 		copied = status;
 
-		cond_resched();
+		cond_resched();                  // 컨디션에 따라 스케쥴러에게 양보를 함 (inode lock 잡은 상태에서? 그럼 위에서 잘못쓰면 병목?)
 
-		iov_iter_advance(i, copied);
+		iov_iter_advance(i, copied);     // 다음번 write할 위치로 iter 이동 
 		if (unlikely(copied == 0)) {
 			/*
 			 * If we were unable to copy any data at all, we must
@@ -184,7 +184,7 @@ again:
 		pos += copied;
 		written += copied;
 
-		balance_dirty_pages_ratelimited(mapping);
+		balance_dirty_pages_ratelimited(mapping);  // 메모리 내의 더티 페이지 비율과 상태를 체크함, 여기서 디스크 flush가 될수 있음 
 	} while (iov_iter_count(i));
 
 	return written ? written : status;
