@@ -499,3 +499,20 @@ static inline ssize_t generic_write_sync(struct kiocb *iocb, ssize_t count)
 }
 ```
 
+그러면 결국 file system별 fsync 함수가 불리게된다. file, 동기화 진행할 range, 메타데이터까지 동기화가 필요한지를 인자로 넘겨줌 
+```c
+int vfs_fsync_range(struct file *file, loff_t start, loff_t end, int datasync)
+{
+	struct inode *inode = file->f_mapping->host;
+
+	if (!file->f_op->fsync)
+		return -EINVAL;
+	if (!datasync && (inode->i_state & I_DIRTY_TIME))
+		mark_inode_dirty_sync(inode);
+	return file->f_op->fsync(file, start, end, datasync);
+}
+EXPORT_SYMBOL(vfs_fsync_range);
+```
+
+
+
