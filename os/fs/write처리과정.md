@@ -343,9 +343,9 @@ int __block_write_begin_int(struct page *page, loff_t pos, unsigned len,
 https://elixir.bootlin.com/linux/v5.11.6/source/include/linux/mm_types.h 
 
 https://elixir.bootlin.com/linux/v5.11.6/source/include/linux/page-flags.h 필요하면 여길 참고하자 
-```
-	PG_private,		/* If pagecache, has fs-private data */ 
-	PG_private_2,		/* If pagecache, has fs aux data */
+```c
+// PG_private,		/* If pagecache, has fs-private data */ 
+// PG_private_2,		/* If pagecache, has fs aux data */
 
 // 기본적으로 page내부에 union으로 여러 타입에 따라 메타데이터를 갈라놓는데  anon 영역이거나, 페이지캐시로 사용되는 캐시는 아래와 같다. 
 struct {
@@ -356,8 +356,7 @@ struct {
 };
 ```
 
-```
-
+```c
 static struct buffer_head *create_page_buffers(struct page *page, struct inode *inode, unsigned int b_state)
 {
 	BUG_ON(!PageLocked(page));
@@ -366,5 +365,35 @@ static struct buffer_head *create_page_buffers(struct page *page, struct inode *
 		create_empty_buffers(page, 1 << READ_ONCE(inode->i_blkbits),
 				     b_state);
 	return page_buffers(page);
+}
+
+
+void create_empty_buffers(struct page *page,
+			unsigned long blocksize, unsigned long b_state)
+{
+	struct buffer_head *bh, *head, *tail;
+
+	head = alloc_page_buffers(page, blocksize, true);
+	bh = head;
+	do {
+		bh->b_state |= b_state;
+		tail = bh;
+		bh = bh->b_this_page;
+	} while (bh);
+	tail->b_this_page = head;
+
+	spin_lock(&page->mapping->private_lock);
+	if (PageUptodate(page) || PageDirty(page)) {
+		bh = head;
+		do {
+			if (PageDirty(page))
+				set_buffer_dirty(bh);
+			if (PageUptodate(page))
+				set_buffer_uptodate(bh);
+			bh = bh->b_this_page;
+		} while (bh != head);
+	}
+	attach_page_private(page, head);
+	spin_unlock(&page->mapping->private_lock);
 }
 ```
