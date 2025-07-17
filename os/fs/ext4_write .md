@@ -258,14 +258,19 @@ static int ext4_write_begin(struct file *file, struct address_space *mapping,
 
 	trace_ext4_write_begin(inode, pos, len, flags);
 	/*
-	 * Reserve one block more for addition to orphan list in case
-	 * we allocate blocks but write fails for some reason
+	 * Reserve one block more for addition to orphan list in case  
+	 * we allocate blocks but write fails for some reason             저널링에 필요한 block 개수 == needed_blocks 
 	 */
 	needed_blocks = ext4_writepage_trans_blocks(inode) + 1;
+
+        // 지금 쓰려는 위치가 파일내의 몇번째 페이지를 가르키는지
 	index = pos >> PAGE_SHIFT;
+        // 페이지 내에서의 offset (bytes)
 	from = pos & (PAGE_SIZE - 1);
+        // 어디까지 쓸려고하는건지 
 	to = from + len;
 
+        // inode의 상태 flag를 체크한다. 마운트시 결정한 inline_data옵션등에 따라, inode 자체에 파일 내용까지 같이 적는 경우에 여기로 타게된다. 
 	if (ext4_test_inode_state(inode, EXT4_STATE_MAY_INLINE_DATA)) {
 		ret = ext4_try_to_write_inline_data(mapping, inode, pos, len,
 						    flags, pagep);
