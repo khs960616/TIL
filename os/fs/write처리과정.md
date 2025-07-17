@@ -361,6 +361,7 @@ static struct buffer_head *create_page_buffers(struct page *page, struct inode *
 {
 	BUG_ON(!PageLocked(page));
 
+        // 파일 시스템상에 정의되어있는, 파일의 block 사이즈를 넘겨준다 (이 사이즈는 항상 sector사이즈의 배수이며(2의 거듭제곱) pagesize보다는 작다는 제약사항을 기억하자) 
 	if (!page_has_buffers(page))
 		create_empty_buffers(page, 1 << READ_ONCE(inode->i_blkbits),
 				     b_state);
@@ -368,11 +369,13 @@ static struct buffer_head *create_page_buffers(struct page *page, struct inode *
 }
 
 
+// 하나의 페이지안에는 여러 블록이 들어있을수있다. (파일시스템에 따라 다름), 이 경우 해당 페이지에 들어갈수있는 버퍼헤더들을 alloc받아서 만들어서 링크드 리스트로 이어두고,
+// attach_page_private를 통해 page 구조체에도 맨처음 buffer 헤더를 페이지에 달아놓으면서 flag를 설정해둔다.
 void create_empty_buffers(struct page *page,
 			unsigned long blocksize, unsigned long b_state)
 {
 	struct buffer_head *bh, *head, *tail;
-
+ 
 	head = alloc_page_buffers(page, blocksize, true);
 	bh = head;
 	do {
