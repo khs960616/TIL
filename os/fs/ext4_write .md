@@ -515,4 +515,65 @@ EXPORT_SYMBOL(vfs_fsync_range);
 ```
 
 
+```c
+int ext4_sync_file(struct file *file, loff_t start, loff_t end, int datasync)
+{
+	int ret = 0, err;
+	bool needs_barrier = false;
+	struct inode *inode = file->f_mapping->host;
+	struct ext4_sb_info *sbi = EXT4_SB(inode->i_sb);
+
+	if (unlikely(ext4_forced_shutdown(sbi)))
+		return -EIO;
+
+	ASSERT(ext4_journal_current_handle() == NULL);
+
+	trace_ext4_sync_file_enter(file, datasync);
+
+	if (sb_rdonly(inode->i_sb)) {
+		/* Make sure that we read updated s_mount_flags value */
+		smp_rmb();
+		if (ext4_test_mount_flag(inode->i_sb, EXT4_MF_FS_ABORTED))
+			ret = -EROFS;
+		goto out;
+	}
+
+	ret = file_write_and_wait_range(file, start, end);  // bio 생성 및 queue에 제출
+	if (ret)
+		goto out;
+
+	/*
+	 * data=writeback,ordered:
+	 *  The caller's filemap_fdatawrite()/wait will sync the data.
+	 *  Metadata is in the journal, we wait for proper transaction to
+	 *  commit here.
+	 *
+	 * data=journal:
+	 *  filemap_fdatawrite won't do anything (the buffers are clean).
+	 *  ext4_force_commit will write the file data into the journal and
+	 *  will wait on that.
+	 *  filemap_fdatawait() will encounter a ton of newly-dirtied pages
+	 *  (they were dirtied by commit).  But that's OK - the blocks are
+	 *  safe in-journal, which is all fsync() needs to ensure.
+	 */
+	if (!sbi->s_journal)  
+		ret = ext4_fsync_nojournal(inode, datasync, &needs_barrier);
+	else if (ext4_should_journal_data(inode))   // 파일시스템 마운트할때 data=journal로 준 경우 
+		ret = ext4_force_commit(inode->i_sb);
+	else        // 파일시스템 마운트할때 data=ordered, writeback으로 준경우 (default가 ordered)  
+		ret = ext4_fsync_journal(inode, datasync, &needs_barrier);
+
+	if (needs_barrier) {
+		err = blkdev_issue_flush(inode->i_sb->s_bdev, GFP_KERNEL);
+		if (!ret)
+			ret = err;
+	}
+out:
+	err = file_check_and_advance_wb_err(file);
+	if (ret == 0)
+		ret = err;
+	trace_ext4_sync_file_exit(inode, ret);
+	return ret;
+}
+```
 
