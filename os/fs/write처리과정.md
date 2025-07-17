@@ -318,6 +318,12 @@ int __block_write_begin_int(struct page *page, loff_t pos, unsigned len,
 				set_buffer_uptodate(bh);
 			continue; 
 		}
+                /* 모든 조건을 만족하면 read 요청이 일어날수도 있다. 
+                 * 1. 버퍼에 데이터가 최신상태가 아닌 경우 (디스크와 동기화되지 않은 경우) 
+                 * 2. 물리적으로 디스크 공간을 할당을 받은 경우 (delay면 물리 블록은 없는 상태)
+                 * 3. 블록이 할당은 되었지만, 아직 데이터가 실제로 쓰여지지 않은 경우
+                 * 4. 현재 요청한 범위과 겹치는 경우  
+                 */
 		if (!buffer_uptodate(bh) && !buffer_delay(bh) &&
 		    !buffer_unwritten(bh) &&
 		     (block_start < from || block_end > to)) {
