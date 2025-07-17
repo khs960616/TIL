@@ -247,14 +247,18 @@ static inline ssize_t call_write_iter(struct file *file, struct kiocb *kio,
 
 
 
+
 버퍼를 초기화 하는 과정 
+
+__block_write_begin 호출 (페이지 캐시에서 페이지를 가져온 이후 호출된다) 
+
 ```c
 int __block_write_begin_int(struct page *page, loff_t pos, unsigned len,
 		get_block_t *get_block, struct iomap *iomap)
 {
-	unsigned from = pos & (PAGE_SIZE - 1);
-	unsigned to = from + len;
-	struct inode *inode = page->mapping->host;
+	unsigned from = pos & (PAGE_SIZE - 1);           // 페이지에서 어디에 쓰려고하는지에 대한 offset
+	unsigned to = from + len;                        // 어디까지 쓸껀지에 대한 정보
+	struct inode *inode = page->mapping->host;       // 이 페이지가 어떤 파일에 대한 것인지에 대한 정보 
 	unsigned block_start, block_end;
 	sector_t block;
 	int err = 0;
@@ -336,6 +340,31 @@ int __block_write_begin_int(struct page *page, loff_t pos, unsigned len,
 ```
 
 
+https://elixir.bootlin.com/linux/v5.11.6/source/include/linux/mm_types.h 
 
+https://elixir.bootlin.com/linux/v5.11.6/source/include/linux/page-flags.h 필요하면 여길 참고하자 
+```
+	PG_private,		/* If pagecache, has fs-private data */ 
+	PG_private_2,		/* If pagecache, has fs aux data */
 
+// 기본적으로 page내부에 union으로 여러 타입에 따라 메타데이터를 갈라놓는데  anon 영역이거나, 페이지캐시로 사용되는 캐시는 아래와 같다. 
+struct {
+    struct list_head lru;
+    struct address_space *mapping;
+    pgoff_t index;
+    unsigned long private;
+};
+```
 
+```
+
+static struct buffer_head *create_page_buffers(struct page *page, struct inode *inode, unsigned int b_state)
+{
+	BUG_ON(!PageLocked(page));
+
+	if (!page_has_buffers(page))
+		create_empty_buffers(page, 1 << READ_ONCE(inode->i_blkbits),
+				     b_state);
+	return page_buffers(page);
+}
+```
