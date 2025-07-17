@@ -480,3 +480,22 @@ static int _ext4_get_block(struct inode *inode, sector_t iblock,
 }
 ```
 
+
+generic 관련 애들은 나중에 fs쪽으로 바꿔놓자, 그리고 내용 정리하면서 buffer i/o  aio 두개로 문서 정리
+
+sync 옵션이 켜져있으면 vfs_fsync_range를 호출시킨다 
+```c 
+static inline ssize_t generic_write_sync(struct kiocb *iocb, ssize_t count)
+{
+	if (iocb->ki_flags & IOCB_DSYNC) {
+		int ret = vfs_fsync_range(iocb->ki_filp,
+				iocb->ki_pos - count, iocb->ki_pos - 1,
+				(iocb->ki_flags & IOCB_SYNC) ? 0 : 1);
+		if (ret)
+			return ret;
+	}
+
+	return count;
+}
+```
+
