@@ -2,7 +2,7 @@
 
 ```
 su -s
-cd /sys/kernel/debug/tracing
+cd /sys/kernel/debug/tracing  
 
 1) 추적하고 싶은 함수들 설정
 echo xxx > set_graph_function
@@ -12,6 +12,9 @@ echo [PID] > set_ftrace_pid
 
 3) 트레이싱 시작 or 종료  (0 또는 1 입력)
 echo 0 or 1  > tracing_on
+
+4) 값 밀고 다시 보고 싶을때
+echo > /sys/kernel/debug/tracing/trace
 ```
 
 ## perf
