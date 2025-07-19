@@ -141,6 +141,7 @@ __iomap_dio_rw(struct kiocb *iocb, struct iov_iter *iter,
 
 	blk_start_plug(&plug);
 	while ((ret = iomap_iter(&iomi, ops)) > 0) {
+                // 여기서 iocb에 있는 iter들을 다 요청을 보냄 
 		iomi.processed = iomap_dio_iter(&iomi, dio);
 
 		/*
