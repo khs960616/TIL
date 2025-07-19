@@ -16,7 +16,11 @@ iomap_dio_rw(struct kiocb *iocb, struct iov_iter *iter,
 }
 ```
 
-```
+```c
+/*
+동기 I/O든 비동기 AIO든 상관없이,
+iomap_dio_rw()가 직접 flush까지 수행해서 "완료된 상태"로 반환
+*/
 struct iomap_dio *
 __iomap_dio_rw(struct kiocb *iocb, struct iov_iter *iter,
 		const struct iomap_ops *ops, const struct iomap_dio_ops *dops,
