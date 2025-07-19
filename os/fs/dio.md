@@ -202,12 +202,12 @@ __iomap_dio_rw(struct kiocb *iocb, struct iov_iter *iter,
 			trace_iomap_dio_rw_queued(inode, iomi.pos, iomi.len);
 			return ERR_PTR(-EIOCBQUEUED);
 		}
-
+                // 여기서 무조건 루프돌면서 대기됨 
 		for (;;) {
 			set_current_state(TASK_UNINTERRUPTIBLE);
 			if (!READ_ONCE(dio->submit.waiter))
 				break;
-
+  
 			blk_io_schedule();
 		}
 		__set_current_state(TASK_RUNNING);
@@ -220,5 +220,18 @@ out_free_dio:
 	if (ret)
 		return ERR_PTR(ret);
 	return NULL;
+}
+```
+
+```c
+void blk_io_schedule(void)
+{
+	/* Prevent hang_check timer from firing at us during very long I/O */
+	unsigned long timeout = sysctl_hung_task_timeout_secs * HZ / 2;
+
+	if (timeout)
+		io_schedule_timeout(timeout);
+	else
+		io_schedule();
 }
 ```
