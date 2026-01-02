@@ -380,3 +380,40 @@ os message상에  oom killer가 동작했을때 프로세스들에 대한 정보
 아 == 또 4.19부터는 
 ~~oom_evaluate_task이거로 쓰는거같음 == 다시 코드 검토하고 내용 추가하자.~~
 어쩌피 그 안에서 badness로 score 매기네, 더 디테일한 부분은 필요할때 더 보자.  
+
+
+참고 (5.14 기준 dump_task 내용) 
+
+```c
+static int dump_task(struct task_struct *p, void *arg)
+{
+	struct oom_control *oc = arg;
+	struct task_struct *task;
+
+	if (oom_unkillable_task(p))
+		return 0;
+
+	/* p may not have freeable memory in nodemask */
+	if (!is_memcg_oom(oc) && !oom_cpuset_eligible(p, oc))
+		return 0;
+
+	task = find_lock_task_mm(p);
+	if (!task) {
+		/*
+		 * All of p's threads have already detached their mm's. There's
+		 * no need to report them; they can't be oom killed anyway.
+		 */
+		return 0;
+	}
+
+	pr_info("[%7d] %5d %5d %8lu %8lu %8ld %8lu         %5hd %s\n",
+		task->pid, from_kuid(&init_user_ns, task_uid(task)),
+		task->tgid, task->mm->total_vm, get_mm_rss(task->mm),
+		mm_pgtables_bytes(task->mm),
+		get_mm_counter(task->mm, MM_SWAPENTS),
+		task->signal->oom_score_adj, task->comm);
+	task_unlock(task);
+
+	return 0;
+}
+```
