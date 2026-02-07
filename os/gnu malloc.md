@@ -187,7 +187,61 @@ static size_t narenas = 1;
 static mstate free_list;
 ```
 
+// 아레나 초기화 함수
+```c
 
+/*
+64비트 glibc → SIZE_SZ = 8
+32비트 glibc → SIZE_SZ = 4
+*/
+#define DEFAULT_MXFAST     (64 * SIZE_SZ / 4) 
+
+static void
+malloc_init_state (mstate av)
+{
+  int i;
+  mbinptr bin;
+
+  /* Establish circular links for normal bins */
+  for (i = 1; i < NBINS; ++i)    // 비어있으면 그냥 bin 객체 깡통으로 fd, bk에 bin 주소를 붙혀버림 
+    {
+      bin = bin_at (av, i);
+      bin->fd = bin->bk = bin;
+    }
+
+#if MORECORE_CONTIGUOUS
+  if (av != &main_arena)	
+#endif
+  set_noncontiguous (av);		//메인 아레나가 아닌 경우에는 flag마킹 (메인 아레나만 brk로 breakpoint늘려가며 사용하고, 다른 아레나들은 mmap 기반으로 쓰니까 뭐)
+  if (av == &main_arena)
+    set_max_fast (DEFAULT_MXFAST);   // fastbin으로 취급할 최대 chunk 크기 한계 설정, default_mxfast 자체가 64bit에서는 128이므로, 요청 크기 약 120바이트 이하까지는 fastbin으로 처리되게됨 
+  atomic_store_relaxed (&av->have_fastchunks, false);
+
+  av->top = initial_top (av);  // top chunk init은 아래서 좀 더 자세히 ! 
+}
+```
+
+```
+/*
+   Top
+
+   사용 가능한 메모리의 끝(brk)에 인접해 있는 가장 위쪽(top-most)의 사용 가능한 청크는 특별하게 취급된다.
+   이 청크는 어떤 bin에도 포함되지 않으며, 다른 사용 가능한 청크가 전혀 없을 때에만 사용된다.
+   또한 이 청크가 매우 큰 경우에는 시스템으로 반환된다, 사이즈 제한은 (M_TRIM_THRESHOLD)을 참고.
+
+    top은 초기에는 크기가 0인 자기 자신의 bin을 가리키도록 되어 있기 때문에,
+    top chunk가 존재하는지 여부를 체크하는 별도 분기 처리 없이 첫 번째 malloc 요청 시 반드시 힙 확장이 일어나도록 강제할 수 있다. 
+
+    그러나 systemalloc (malloc 내부에서 실제 os로부터 메모리를 받아오는 경우)에서는
+    현재 top/힙 상태가 초기 상태인지, 정상 heap 상태인지”를 정확히 구분해서 힙 레이아웃을 맞춰야하기 떄문에, 
+    따라서 initial_top 매크로로 초기 상태인지 체크한다. 
+ 
+    malloc_check.c쪽   top_check 쓰이는 코드들 보는게 이해가 빠를듯.. 
+ */
+
+/* Conveniently, the unsorted bin can be used as dummy top on first call */
+#define initial_top(M)              (unsorted_chunks (M))
+```
 
 
 
