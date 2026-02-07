@@ -86,6 +86,200 @@ fd_nextsize / bk_nextsize  (large bin에는 크기 순서로 정렬 안되있어
 https://github.com/khs960616/TIL/blob/main/os/heap(bin).md 여기 예전에 써놨었네.. 
 
 
+---
+결국에 모든 malloc요청은 
+__libc_malloc 통해서 들어오는 거 같고, 해당 함수 내부에서 만약에 malloc_initialized 변수가 설정되어있지 않다면 
+
+ptmalloc_init를 호출해서 초기화한다.  (arena.c 에 위치함)
+
+```c
+static void
+ptmalloc_init (void)
+{
+  if (__malloc_initialized)
+    return;
+
+  __malloc_initialized = true;
+
+#if USE_TCACHE
+  tcache_key_initialize ();
+#endif
+
+#ifdef USE_MTAG
+  if ((TUNABLE_GET_FULL (glibc, mem, tagging, int32_t, NULL) & 1) != 0)
+    {
+      /* If the tunable says that we should be using tagged memory
+	 and that morecore does not support tagged regions, then
+	 disable it.  */
+      if (__MTAG_SBRK_UNTAGGED)
+	__always_fail_morecore = true;
+
+      mtag_enabled = true;
+      mtag_mmap_flags = __MTAG_MMAP_FLAGS;
+    }
+#endif
+
+#if defined SHARED && IS_IN (libc)
+  /* In case this libc copy is in a non-default namespace, never use
+     brk.  Likewise if dlopened from statically linked program.  The
+     generic sbrk implementation also enforces this, but it is not
+     used on Hurd.  */
+  if (!__libc_initial)
+    __always_fail_morecore = true;
+#endif
+
+  thread_arena = &main_arena;
+
+  malloc_init_state (&main_arena);
+
+#if HAVE_TUNABLES
+  TUNABLE_GET (top_pad, size_t, TUNABLE_CALLBACK (set_top_pad));
+  TUNABLE_GET (perturb, int32_t, TUNABLE_CALLBACK (set_perturb_byte));
+  TUNABLE_GET (mmap_threshold, size_t, TUNABLE_CALLBACK (set_mmap_threshold));
+  TUNABLE_GET (trim_threshold, size_t, TUNABLE_CALLBACK (set_trim_threshold));
+  TUNABLE_GET (mmap_max, int32_t, TUNABLE_CALLBACK (set_mmaps_max));
+  TUNABLE_GET (arena_max, size_t, TUNABLE_CALLBACK (set_arena_max));
+  TUNABLE_GET (arena_test, size_t, TUNABLE_CALLBACK (set_arena_test));
+# if USE_TCACHE
+  TUNABLE_GET (tcache_max, size_t, TUNABLE_CALLBACK (set_tcache_max));
+  TUNABLE_GET (tcache_count, size_t, TUNABLE_CALLBACK (set_tcache_count));
+  TUNABLE_GET (tcache_unsorted_limit, size_t,
+	       TUNABLE_CALLBACK (set_tcache_unsorted_limit));
+# endif
+  TUNABLE_GET (mxfast, size_t, TUNABLE_CALLBACK (set_mxfast));
+#else
+  if (__glibc_likely (_environ != NULL))
+    {
+      char **runp = _environ;
+      char *envline;
+
+      while (__builtin_expect ((envline = next_env_entry (&runp)) != NULL,
+                               0))
+        {
+          size_t len = strcspn (envline, "=");
+
+          if (envline[len] != '=')
+            /* This is a "MALLOC_" variable at the end of the string
+               without a '=' character.  Ignore it since otherwise we
+               will access invalid memory below.  */
+            continue;
+
+          switch (len)
+            {
+            case 8:
+              if (!__builtin_expect (__libc_enable_secure, 0))
+                {
+                  if (memcmp (envline, "TOP_PAD_", 8) == 0)
+                    __libc_mallopt (M_TOP_PAD, atoi (&envline[9]));
+                  else if (memcmp (envline, "PERTURB_", 8) == 0)
+                    __libc_mallopt (M_PERTURB, atoi (&envline[9]));
+                }
+              break;
+            case 9:
+              if (!__builtin_expect (__libc_enable_secure, 0))
+                {
+                  if (memcmp (envline, "MMAP_MAX_", 9) == 0)
+                    __libc_mallopt (M_MMAP_MAX, atoi (&envline[10]));
+                  else if (memcmp (envline, "ARENA_MAX", 9) == 0)
+                    __libc_mallopt (M_ARENA_MAX, atoi (&envline[10]));
+                }
+              break;
+            case 10:
+              if (!__builtin_expect (__libc_enable_secure, 0))
+                {
+                  if (memcmp (envline, "ARENA_TEST", 10) == 0)
+                    __libc_mallopt (M_ARENA_TEST, atoi (&envline[11]));
+                }
+              break;
+            case 15:
+              if (!__builtin_expect (__libc_enable_secure, 0))
+                {
+                  if (memcmp (envline, "TRIM_THRESHOLD_", 15) == 0)
+                    __libc_mallopt (M_TRIM_THRESHOLD, atoi (&envline[16]));
+                  else if (memcmp (envline, "MMAP_THRESHOLD_", 15) == 0)
+                    __libc_mallopt (M_MMAP_THRESHOLD, atoi (&envline[16]));
+                }
+              break;
+            default:
+              break;
+            }
+        }
+    }
+#endif
+}
+
+```
+
+
+```c
+#if IS_IN (libc)
+void *
+__libc_malloc (size_t bytes)
+{
+  mstate ar_ptr;
+  void *victim;
+
+  _Static_assert (PTRDIFF_MAX <= SIZE_MAX / 2,
+                  "PTRDIFF_MAX is not more than half of SIZE_MAX");
+
+  // 초기화 되지 않았으면 ptmalloc_init(); 
+  if (!__malloc_initialized)
+    ptmalloc_init ();
+#if USE_TCACHE
+  /* int_free also calls request2size, be careful to not pad twice.  */
+  size_t tbytes;
+  if (!checked_request2size (bytes, &tbytes))
+    {
+      __set_errno (ENOMEM);
+      return NULL;
+    }
+  size_t tc_idx = csize2tidx (tbytes);
+
+  MAYBE_INIT_TCACHE ();
+
+  DIAG_PUSH_NEEDS_COMMENT;
+  if (tc_idx < mp_.tcache_bins
+      && tcache
+      && tcache->counts[tc_idx] > 0)
+    {
+      victim = tcache_get (tc_idx);
+      return tag_new_usable (victim);
+    }
+  DIAG_POP_NEEDS_COMMENT;
+#endif
+
+  if (SINGLE_THREAD_P)
+    {
+      victim = tag_new_usable (_int_malloc (&main_arena, bytes));
+      assert (!victim || chunk_is_mmapped (mem2chunk (victim)) ||
+	      &main_arena == arena_for_chunk (mem2chunk (victim)));
+      return victim;
+    }
+
+  arena_get (ar_ptr, bytes);
+
+  victim = _int_malloc (ar_ptr, bytes);
+  /* Retry with another arena only if we were able to find a usable arena
+     before.  */
+  if (!victim && ar_ptr != NULL)
+    {
+      LIBC_PROBE (memory_malloc_retry, 1, bytes);
+      ar_ptr = arena_get_retry (ar_ptr, bytes);
+      victim = _int_malloc (ar_ptr, bytes);
+    }
+
+  if (ar_ptr != NULL)
+    __libc_lock_unlock (ar_ptr->mutex);
+
+  victim = tag_new_usable (victim);
+
+  assert (!victim || chunk_is_mmapped (mem2chunk (victim)) ||
+          ar_ptr == arena_for_chunk (mem2chunk (victim)));
+  return victim;
+}
+libc_hidden_def (__libc_malloc)
+```
+
 
 
 
