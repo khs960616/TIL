@@ -56,5 +56,15 @@ GNU C Library의 malloc 구현은 멀티스레드 애플리케이션에서의 �
 
 ---
 
+chunk 구조 
+
+- in use chunk 
+
+실제 유저 공간에서 바라보는 데이터 외에도 청크의 사이즈 정보와 일부 메타정보를 나타내는 Flag를 가진다. 
+
+| size    | LSB(3) - (A|M|P)| 
+
+-> A: 메인 아레나에 소속된 chunk인지 여부 (0이면 main 아레나 소속), M: chunk자체가 특정 heap에 속한 것이 아니라, mmap으로 할당된 것인지 여부, P: 이전 chunk가 사용중인지 여부 
+
 
 
