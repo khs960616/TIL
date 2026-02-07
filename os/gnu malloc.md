@@ -86,13 +86,38 @@ fd_nextsize / bk_nextsize  (large bin에는 크기 순서로 정렬 안되있어
 https://github.com/khs960616/TIL/blob/main/os/heap(bin).md 여기 예전에 써놨었네.. 
 
 
+### thread local cache
+
+각 스레드는 자신이 마지막으로 사용했던 arena가 무엇인지 기억하는 스레드 로컬 변수를 갖는다. 
+
+각 스레드는 그 arena를 사용해야 할 때 해당 arena가 이미 사용 중이면, arena가 비게 될 때까지 기다리며 block된다.
+
+스레드가 이전에 어떤 arena도 사용해본 적이 없다면, 사용되지 않는 arena를 재사용하려고 시도하거나,  새 arena를 만들거나, 전역 리스트에서 다음 arena를 고르는 방식으로 진행한다. 
+
+각 스레드는 tcache라고 불리는 스레드별 캐시를 가지고 있어, arena에 대한 Lock 없이 얻을 수 있는 작은 chunk 들이 존재한다. 
+
+chunk들은 fastbin과 비슷하게 단일 연결 리스트들의 배열 형태로 저장되지만, 링크가 chunk 헤더가 아니라 payload(사용자 영역)를 가리킨다는 점이 다르다. 
+
+각 bin은 하나의 크기 chunk만 담으므로, 이 배열은 chunk 크기별로 인덱싱된다. 
+
+fastbin과 달리 tcache는 각 bin에 들어갈 수 있는 chunk 개수에 제한이 있으며(tcache_count), 
+
+어떤 요청 크기에 대해 해당 tcache bin이 비어 있으면 그 다음으로 더 큰 크기의 chunk를 사용하지 않는다.
+
+대신 정상적인 malloc 루틴으로 폴백하게 된다.  (tcache 먼저 접근해보고 안되면 malloc 루틴으로 가는듯 
+
 ---
+
+### 코드 검토 
 결국에 모든 malloc요청은 
 __libc_malloc 통해서 들어오는 거 같고, 해당 함수 내부에서 만약에 malloc_initialized 변수가 설정되어있지 않다면 
 
 ptmalloc_init를 호출해서 초기화한다.  (arena.c 에 위치함)
 
 ```c
+/* Already initialized? */
+static bool __malloc_initialized = false;
+
 static void
 ptmalloc_init (void)
 {
