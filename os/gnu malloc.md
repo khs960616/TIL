@@ -56,7 +56,7 @@ GNU C Library의 malloc 구현은 멀티스레드 애플리케이션에서의 �
 
 ---
 
-chunk 구조 
+### chunk 구조 (일부 구현 레벨 내용 참고용)
 
 - in use chunk 
 
@@ -75,8 +75,18 @@ fwd, bck (아마 기억상 bin에 달려있을때 다른 free chunk들과 연결
 
 fd_nextsize / bk_nextsize  (large bin에는 크기 순서로 정렬 안되있어서, 자기 자신보다 큰, 원소 주소 빨리 찾으려고 달아두는듯)
 
-
 (mchunk_ptr (실제 유저 공간에 나가 있는 chunk가 아니라 prev size를 포함한 시작주소,  glibc쪽은 일단 유저 공간에서 바라보는 payload외에도 size나 flag정보는 chunk라고 보네?)
+
+(arena 관련된 구조체는 초기에 확보한 heap 공간(메모리 덩어리) 맨 앞에다가 메타 포함시켜서씀)
+
+--
+
+### bin
+
+https://github.com/khs960616/TIL/blob/main/os/heap(bin).md 여기 예전에 써놨었네.. 
+
+
+
 
 
 
