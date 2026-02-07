@@ -67,4 +67,18 @@ chunk 구조
 -> A: 메인 아레나에 소속된 chunk인지 여부 (0이면 main 아레나 소속), M: chunk자체가 특정 heap에 속한 것이 아니라, mmap으로 할당된 것인지 여부, P: 이전 chunk가 사용중인지 여부 
 
 
+- free chunk
+
+fwd, bck (아마 기억상 bin에 달려있을때 다른 free chunk들과 연결해놓기 위한 포인터)
+
+(prev_size: free상태일때는 payload공간으로 나가는 맨 마지막쪽 (다른 chunk와 인접한 위치)에 자기 자신의 chunk size를 써둔다)
+
+fd_nextsize / bk_nextsize  (large bin에는 크기 순서로 정렬 안되있어서, 자기 자신보다 큰, 원소 주소 빨리 찾으려고 달아두는듯)
+
+
+(mchunk_ptr (실제 유저 공간에 나가 있는 chunk가 아니라 prev size를 포함한 시작주소,  glibc쪽은 일단 유저 공간에서 바라보는 payload외에도 size나 flag정보는 chunk라고 보네?)
+
+
+
+
 
