@@ -221,6 +221,78 @@ malloc_init_state (mstate av)
 }
 ```
 
+// 새로운 아레나 생성 함수 
+```c
+static mstate
+_int_new_arena (size_t size)
+{
+  mstate a;
+  heap_info *h;
+  char *ptr;
+  unsigned long misalign;
+
+  h = new_heap (size + (sizeof (*h) + sizeof (*a) + MALLOC_ALIGNMENT),
+                mp_.top_pad);
+  if (!h)
+    {
+      /* Maybe size is too large to fit in a single heap.  So, just try
+         to create a minimally-sized arena and let _int_malloc() attempt
+         to deal with the large request via mmap_chunk().  */
+      h = new_heap (sizeof (*h) + sizeof (*a) + MALLOC_ALIGNMENT, mp_.top_pad);
+      if (!h)
+        return 0;
+    }
+  a = h->ar_ptr = (mstate) (h + 1);
+  malloc_init_state (a);
+  a->attached_threads = 1;
+  /*a->next = NULL;*/
+  a->system_mem = a->max_system_mem = h->size;
+
+  /* Set up the top chunk, with proper alignment. */
+  ptr = (char *) (a + 1);
+  misalign = (unsigned long) chunk2mem (ptr) & MALLOC_ALIGN_MASK;
+  if (misalign > 0)
+    ptr += MALLOC_ALIGNMENT - misalign;
+  top (a) = (mchunkptr) ptr;
+  set_head (top (a), (((char *) h + h->size) - ptr) | PREV_INUSE);
+
+  LIBC_PROBE (memory_arena_new, 2, a, size);
+  mstate replaced_arena = thread_arena;
+  thread_arena = a;
+  __libc_lock_init (a->mutex);
+
+  __libc_lock_lock (list_lock);
+
+  /* Add the new arena to the global list.  */
+  a->next = main_arena.next;
+  /* FIXME: The barrier is an attempt to synchronize with read access
+     in reused_arena, which does not acquire list_lock while
+     traversing the list.  */
+  atomic_write_barrier ();
+  main_arena.next = a;
+
+  __libc_lock_unlock (list_lock);
+
+  __libc_lock_lock (free_list_lock);
+  detach_arena (replaced_arena);
+  __libc_lock_unlock (free_list_lock);
+
+  /* Lock this arena.  NB: Another thread may have been attached to
+     this arena because the arena is now accessible from the
+     main_arena.next list and could have been picked by reused_arena.
+     This can only happen for the last arena created (before the arena
+     limit is reached).  At this point, some arena has to be attached
+     to two threads.  We could acquire the arena lock before list_lock
+     to make it less likely that reused_arena picks this new arena,
+     but this could result in a deadlock with
+     __malloc_fork_lock_parent.  */
+
+  __libc_lock_lock (a->mutex);
+
+  return a;
+}
+```
+
 ```
 /*
    Top
@@ -422,12 +494,14 @@ arena_get2 (size_t size, mstate avoid_arena)
       /* Nothing immediately available, so generate a new arena.  */
       if (narenas_limit == 0)  
         {
-          if (mp_.arena_max != 0)
+          if (mp_.arena_max != 0)   // MALLOC_ARENA_MAX 값을 유저가 따로 설정해뒀으면 그 값을 그대로 사용, 
             narenas_limit = mp_.arena_max;
-          else if (narenas > mp_.arena_test)
+          else if (narenas > mp_.arena_test)  // 현재 아레나 개수가 arena_test를 넘기면, 이 시점에는  CPU 개수 기반하여 limit을 처버림
             {
               int n = __get_nprocs ();
-
+              /*  참고로 64bit 머신 기준으로는 cpu 개수 * 8 이 기본적인 상한값
+			     #define NARENAS_FROM_NCORES(n) ((n) * (sizeof (long) == 4 ? 2 : 8))
+              */
               if (n >= 1)
                 narenas_limit = NARENAS_FROM_NCORES (n);
               else
@@ -445,10 +519,16 @@ arena_get2 (size_t size, mstate avoid_arena)
          narenas_limit is 0.  There is no possibility for narenas to
          be too big for the test to always fail since there is not
          enough address space to create that many arenas.  */
+
+      /* 새로운 아레나를 생성할 수 있는지 체크 */
       if (__glibc_unlikely (n <= narenas_limit - 1))
         {
+           /* CAS로 arena 개수 증가를 시도해보는데, 실패했다면 재시도 때림  */
           if (catomic_compare_and_exchange_bool_acq (&narenas, n + 1, n))
             goto repeat;
+
+          // 아레나 개수 늘리는데 성공했다면 new_arena
+
           a = _int_new_arena (size);
 	  if (__glibc_unlikely (a == NULL))
             catomic_decrement (&narenas);
