@@ -104,11 +104,94 @@ fastbin과 달리 tcache는 각 bin에 들어갈 수 있는 chunk 개수에 제�
 
 어떤 요청 크기에 대해 해당 tcache bin이 비어 있으면 그 다음으로 더 큰 크기의 chunk를 사용하지 않는다.
 
-대신 정상적인 malloc 루틴으로 폴백하게 된다.  (tcache 먼저 접근해보고 안되면 malloc 루틴으로 가는듯 
+대신 정상적인 malloc 루틴으로 폴백하게 된다.  (tcache 먼저 접근해보고 안되면 malloc 루틴으로 가는듯)
+
+
 
 ---
 
 ### 코드 검토 
+
+#### 구조체 
+```c
+/*
+   ----------- Internal state representation and initialization -----------
+ */
+
+/*
+   have_fastchunks indicates that there are probably some fastbin chunks.
+   It is set true on entering a chunk into any fastbin, and cleared early in
+   malloc_consolidate.  The value is approximate since it may be set when there
+   are no fastbin chunks, or it may be clear even if there are fastbin chunks
+   available.  Given it's sole purpose is to reduce number of redundant calls to
+   malloc_consolidate, it does not affect correctness.  As a result we can safely
+   use relaxed atomic accesses.
+ */
+
+
+struct malloc_state
+{
+  // 아래나 보호용 mutex
+  __libc_lock_define (, mutex);		
+
+  /* Flags (formerly in max_fast).  */
+  int flags;
+
+  /* Set if the fastbin chunks contain recently inserted free blocks.  */
+  /* Note this is a bool but not all targets support atomics on booleans.  */
+  int have_fastchunks;
+
+  /* Fastbins */
+  mfastbinptr fastbinsY[NFASTBINS];
+
+  // top chunk
+  mchunkptr top; 
+
+  // dv청크 같은건가? 최근에 request때 쓰고 남은 chunk   * The remainder from the most recent split of a small request */
+  mchunkptr last_remainder;
+
+  // smallbin + large bin 합쳐서 chunk들 관리하는 배열
+  mchunkptr bins[NBINS * 2 - 2];
+
+  // bin이 비어있는지 여부를 빨리 체크하기 위한 bitmap
+  unsigned int binmap[BINMAPSIZE];
+
+  /* Linked list */				// 아레나끼리도 링크드 리스트로 연결되있는듯 
+  struct malloc_state *next;
+
+  /* Linked list for free arenas.  Access to this field is serialized
+     by free_list_lock in arena.c.  */ 
+  struct malloc_state *next_free;        // 어떤 스레드에도 붙어 있지 않은 경우, free_list에 달아두기 위해 사용하는 link 역할을 하게 된다. (아래 참고) 
+
+  /* Number of threads attached to this arena.  0 if the arena is on
+     the free list.  Access to this field is serialized by
+     free_list_lock in arena.c.  */
+  INTERNAL_SIZE_T attached_threads;  // 이 아레나에 붙어있는 스레드 개수
+
+  /* Memory allocated from the system in this arena.  */
+  INTERNAL_SIZE_T system_mem;   // OS로부터 직접 확보한 메모리 총량
+  INTERNAL_SIZE_T max_system_mem; // 이전에 확보한 메모리 총량  (malloc info에서 얘네 찍어주는거였네;)
+};
+```
+
+```c
+/* Arena free list.  free_list_lock synchronizes access to the
+   free_list variable below, and the next_free and attached_threads
+   members of struct malloc_state objects.  No other locks must be
+   acquired after free_list_lock has been acquired.  */
+
+__libc_lock_define_initialized (static, free_list_lock);
+#if IS_IN (libc)
+static size_t narenas = 1;
+#endif
+static mstate free_list;
+```
+
+
+
+
+
+#### 로직 
 결국에 모든 malloc요청은 
 __libc_malloc 통해서 들어오는 거 같고, 해당 함수 내부에서 만약에 malloc_initialized 변수가 설정되어있지 않다면 
 
@@ -117,6 +200,9 @@ ptmalloc_init를 호출해서 초기화한다.  (arena.c 에 위치함)
 ```c
 /* Already initialized? */
 static bool __malloc_initialized = false;
+
+// thread areana 변수 
+static __thread mstate thread_arena attribute_tls_model_ie;
 
 static void
 ptmalloc_init (void)
@@ -130,19 +216,25 @@ ptmalloc_init (void)
   tcache_key_initialize ();
 #endif
 
+
+// USE_MTAG 관련된 건 일단, arm 아키텍처인 경우 아니면 딱히 고려 안해도될듯? 
+// GLIBC_TUNABLES=glibc.mem.tagging=1 
+
 #ifdef USE_MTAG
   if ((TUNABLE_GET_FULL (glibc, mem, tagging, int32_t, NULL) & 1) != 0)
     {
       /* If the tunable says that we should be using tagged memory
 	 and that morecore does not support tagged regions, then
 	 disable it.  */
-      if (__MTAG_SBRK_UNTAGGED)
+      if (__MTAG_SBRK_UNTAGGED)  // 해당 아키텍처에서 sbrk 영역이 태그를 지원하지 않는 케이스
 	__always_fail_morecore = true;
 
       mtag_enabled = true;
       mtag_mmap_flags = __MTAG_MMAP_FLAGS;
     }
 #endif
+
+// dlopen 등으로 libc 여는 등 희안한 형태로 쓰는거 아니면 여기 걸릴 일도 없어 보임 
 
 #if defined SHARED && IS_IN (libc)
   /* In case this libc copy is in a non-default namespace, never use
@@ -153,6 +245,7 @@ ptmalloc_init (void)
     __always_fail_morecore = true;
 #endif
 
+  // main process의 tls변수에 main areana 설정 
   thread_arena = &main_arena;
 
   malloc_init_state (&main_arena);
@@ -235,6 +328,16 @@ ptmalloc_init (void)
 
 ```
 
+```c
+// main arena는 조기에 전역변수로 아래값들 설정함 (나머지는 0) 
+static struct malloc_state main_arena =   
+{
+  .mutex = _LIBC_LOCK_INITIALIZER,
+  .next = &main_arena,
+  .attached_threads = 1
+};
+```
+
 
 ```c
 #if IS_IN (libc)
@@ -306,6 +409,31 @@ libc_hidden_def (__libc_malloc)
 ```
 
 
+```c
+/* The value of tcache_key does not really have to be a cryptographically
+   secure random number.  It only needs to be arbitrary enough so that it does
+   not collide with values present in applications.  If a collision does happen
+   consistently enough, it could cause a degradation in performance since the
+   entire list is checked to check if the block indeed has been freed the
+   second time.  The odds of this happening are exceedingly low though, about 1
+   in 2^wordsize.  There is probably a higher chance of the performance
+   degradation being due to a double free where the first free happened in a
+   different thread; that's a case this check does not cover.  */
+
+// 결국에 double free 방지하기 위한 일종의 key값을 free 시점에 페이로드에 박아놓고 사용하는 것 같음 (일단 메모리 할당 로직에서 예외나 디버깅 로직은 필요하면 다시 보자) 
+static void
+tcache_key_initialize (void)
+{
+  if (__getrandom (&tcache_key, sizeof(tcache_key), GRND_NONBLOCK)
+      != sizeof (tcache_key))
+    {
+      tcache_key = random_bits ();
+#if __WORDSIZE == 64
+      tcache_key = (tcache_key << 32) | random_bits ();
+#endif
+    }
+}
+```
 
 
 
