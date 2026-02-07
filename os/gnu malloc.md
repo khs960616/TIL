@@ -392,6 +392,75 @@ static struct malloc_state main_arena =
 };
 ```
 
+```c
+
+// tls변수에 arena 설정 시, mutex 획득까지 기다리기, 없다면 arena_get2 호출해서 tls
+#define arena_get(ptr, size) do { \
+      ptr = thread_arena;						         \
+      arena_lock (ptr, size);						      \
+  } while (0)
+
+#define arena_lock(ptr, size) do {					      \
+      if (ptr)								      \
+        __libc_lock_lock (ptr->mutex);					      \
+      else								      \
+        ptr = arena_get2 ((size), NULL);				      \
+  } while (0)
+```
+
+```c
+static mstate
+arena_get2 (size_t size, mstate avoid_arena)
+{
+  mstate a;
+
+  static size_t narenas_limit;
+
+  a = get_free_list ();     // free_list (attach된 스레드가 없는 arena가 있는지 체크해서, 있다면 바로 해당 arena 리턴 
+  if (a == NULL)
+    {
+      /* Nothing immediately available, so generate a new arena.  */
+      if (narenas_limit == 0)  
+        {
+          if (mp_.arena_max != 0)
+            narenas_limit = mp_.arena_max;
+          else if (narenas > mp_.arena_test)
+            {
+              int n = __get_nprocs ();
+
+              if (n >= 1)
+                narenas_limit = NARENAS_FROM_NCORES (n);
+              else
+                /* We have no information about the system.  Assume two
+                   cores.  */
+                narenas_limit = NARENAS_FROM_NCORES (2);
+            }
+        }
+    repeat:;
+      size_t n = narenas;
+      /* NB: the following depends on the fact that (size_t)0 - 1 is a
+         very large number and that the underflow is OK.  If arena_max
+         is set the value of arena_test is irrelevant.  If arena_test
+         is set but narenas is not yet larger or equal to arena_test
+         narenas_limit is 0.  There is no possibility for narenas to
+         be too big for the test to always fail since there is not
+         enough address space to create that many arenas.  */
+      if (__glibc_unlikely (n <= narenas_limit - 1))
+        {
+          if (catomic_compare_and_exchange_bool_acq (&narenas, n + 1, n))
+            goto repeat;
+          a = _int_new_arena (size);
+	  if (__glibc_unlikely (a == NULL))
+            catomic_decrement (&narenas);
+        }
+      else
+        a = reused_arena (avoid_arena);
+    }
+  return a;
+}
+```
+
+
 
 ```c
 #if IS_IN (libc)
@@ -410,12 +479,27 @@ __libc_malloc (size_t bytes)
 #if USE_TCACHE
   /* int_free also calls request2size, be careful to not pad twice.  */
   size_t tbytes;
+
+/*
+ 요청온 사이즈 bytes가  define PTRDIFF_MAX		(9223372036854775807L) 보다 큰,
+ 말도 안되는 요청인 경우 false, 그 외의 경우에는 tbytes에
+
+#define request2size(req)                                         \
+  (((req) + SIZE_SZ + MALLOC_ALIGN_MASK < MINSIZE)  ?             \
+   MINSIZE :                                                      \
+   ((req) + SIZE_SZ + MALLOC_ALIGN_MASK) & ~MALLOC_ALIGN_MASK)
+
+로 값을 계산해서 실제 할당할 메모리를 걸어두게 된다. (메타 포함된 chunk 사이즈) 
+
+*/
   if (!checked_request2size (bytes, &tbytes))
     {
       __set_errno (ENOMEM);
       return NULL;
     }
-  size_t tc_idx = csize2tidx (tbytes);
+
+/* ================ [case1]  tcache에서 chunk를 가져오는 경우 ================   */
+  size_t tc_idx = csize2tidx (tbytes);  // tcache부터 탐색을 위한 idx 계산 
 
   MAYBE_INIT_TCACHE ();
 
@@ -429,6 +513,7 @@ __libc_malloc (size_t bytes)
     }
   DIAG_POP_NEEDS_COMMENT;
 #endif
+/* ===================================================================   */
 
   if (SINGLE_THREAD_P)
     {
@@ -440,7 +525,7 @@ __libc_malloc (size_t bytes)
 
   arena_get (ar_ptr, bytes);
 
-  victim = _int_malloc (ar_ptr, bytes);
+  victim = _int_malloc (ar_ptr, bytes); 
   /* Retry with another arena only if we were able to find a usable arena
      before.  */
   if (!victim && ar_ptr != NULL)
