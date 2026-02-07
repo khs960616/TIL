@@ -529,12 +529,15 @@ arena_get2 (size_t size, mstate avoid_arena)
 
           // 아레나 개수 늘리는데 성공했다면 new_arena
 
-          a = _int_new_arena (size);
+          a = _int_new_arena (size);    // 이 안에서 새로 아레나 만들면서 tls 변수에 arena 걸어둠 
 	  if (__glibc_unlikely (a == NULL))
-            catomic_decrement (&narenas);
+            catomic_decrement (&narenas); 
         }
       else
-        a = reused_arena (avoid_arena);
+        a = reused_arena (avoid_arena);  // 마찬가지로 여기서도 아레나 tls변수에 걸어둠 
+                                         // reused_arena는 전역변수 next_to_use (areana)를 기준으로 try lock으로 arena들 잡아보면서 attach해봄
+                                         // 안잡히면 그냥 next_to_use에 대한 blocking lock을 잡고 선정한다 (next_to_use가 avoid arena라면 그 다음거)
+                                         // 선정되면 next_to_use값은 현재 선정된거 다음으로 옮김 
     }
   return a;
 }
