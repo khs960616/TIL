@@ -606,7 +606,7 @@ __libc_malloc (size_t bytes)
       return victim;
     }
 
-  arena_get (ar_ptr, bytes);
+  arena_get (ar_ptr, bytes);  /
 
   victim = _int_malloc (ar_ptr, bytes); 
   /* Retry with another arena only if we were able to find a usable arena
